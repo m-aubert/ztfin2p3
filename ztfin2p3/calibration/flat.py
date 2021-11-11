@@ -2,7 +2,7 @@
 """ library to build the ztfin2p3 pipeline screen flats """
 import os
 import pandas
-from .io import FLAT_DIR 
+from ..io import FLAT_DIR 
 
 class RawFlatMeta( object ):
     """ 

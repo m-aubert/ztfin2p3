@@ -2,6 +2,7 @@
 """ library to build the ztfin2p3 pipeline screen flats """
 import os
 import pandas
+import numpy as np
 from ..io import FLAT_DIR 
 
 class RawFlatMeta( object ):
@@ -31,6 +32,22 @@ class RawFlatMeta( object ):
 
         return pandas.read_parquet(filepath, **kwargs)
 
+    @classmethod
+    def get_yearly_zquery(cls, year, force_dl=False, daterange=[None,None]):
+        """ """
+        from ztfquery import query
+        data = cls.get_yearly_metadata(year, force_dl=force_dl)
+        return query.ZTFQuery(data, "raw")
+        
+
+    @classmethod
+    def get_rawflatfile(cls, year, ccdid):
+        """ """
+        zquery = query.ZTFQuery(data, "raw")
+        
+        indexes_ccds = zquery.data[zquery.data["ccdid"].isin( np.atleast_1d(ccdid) ) ].index
+        files_to_dl = [l.split("/")[-1] for l in zquery.get_data_path(indexes=indexes_ccds)]
+        future_files = io.bulk_get_file(files_to_dl, client=client, as_dask="futures")
     # ============== #
     #  INTERNAL      #
     # ============== #
@@ -55,6 +72,7 @@ class RawFlatMeta( object ):
             
         return 
     
+
 
         
 

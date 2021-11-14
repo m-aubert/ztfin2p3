@@ -1,6 +1,7 @@
 """ Handling metadata """
 
 import os
+import numpy as np
 import pandas
 from .utils.tools import parse_singledate
             

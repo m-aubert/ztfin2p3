@@ -72,7 +72,7 @@ class MetaDataHandler( object ):
             
         if type(date) is str and len(date) == 6: # means per month as stored.
             return cls.get_monthly_metadata(date[:4],date[4:])
-        elif type(date) is str
+        elif type(date) is str:
             start, end = parse_singledate(date) # -> start, end
         else:
             from astropy import time 

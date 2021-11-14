@@ -22,7 +22,7 @@ class MetaDataHandler( object ):
     @classmethod
     def get_monthly_metadatafile(cls, year, month):
         """ """
-
+        from .io import get_directory
         if cls._KIND is None or cls._SUBKIND is None:
             raise AttributeError(f"_KIND {cls._KIND} or _SUBKIND {cls._SUBKIND} is None. Please define them")
 

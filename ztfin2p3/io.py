@@ -16,6 +16,17 @@ BIAS_DIR = os.path.join(BASESOURCE, "cal/bias")
 FLAT_DIR = os.path.join(BASESOURCE, "cal/flat")
 STARFLAT_DIR = os.path.join(BASESOURCE, "cal/starflat")
 
+
+
+def get_directory(kind, subkind):
+    """ """
+    if subkind == "flat":
+        return FLAT_DIR
+    if subkind == "bias":
+        return BIAS_DIR
+    if subkind == "starflat":
+        return STARFLAT_DIR
+        
 # =========== #
 #  BIAS       #
 # =========== #

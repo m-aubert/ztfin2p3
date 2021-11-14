@@ -34,7 +34,31 @@ class RawFlatMeta( object ):
 
     @classmethod
     def get_metadata(cls, date, format=None):
-        """ """
+        """ General method to access the IRSA metadata given a date or a daterange. 
+
+        The format of date is very flexible to quickly get what you need:
+
+        Parameters
+        ----------
+        date: [string (or list of)]
+            date can either be a single string or a list of two dates in isoformat.
+            - two dates format: date=['start','end'] is isoformat
+              e.g. date=['2019-03-14','2019-03-25']
+            
+            - single string: four format are then accepted, year, month, week or day:
+                - yyyy: get the full year. (string of length 4)
+                       e.g. date='2019'
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+        Returns
+        -------
+        dataframe (IRSA metadata)
+        """
         if date is None:
             raise ValueError("date cannot be None, could be string, float, or list of 2 strings")
         if not hasattr(date, "__iter__"): # int/float given, convert to string
@@ -42,6 +66,7 @@ class RawFlatMeta( object ):
             
         if type(date) is str and len(date) == 4:
             return cls.get_yearly_metadata(date)
+        
         elif type(date) is str:
             from ..utils.tools import parse_singledate
             start, end = parse_singledate(date) # -> start, end

@@ -1,6 +1,7 @@
 """ Handling metadata """
 
 import os
+import pandas
 from .utils.tools import parse_singledate
             
 class MetaDataHandler( object ):
@@ -104,7 +105,6 @@ class RawFlatMetaData( MetaDataHandler ):
     @classmethod
     def build_monthly_metadata(cls, year, month):
         """ """
-        
         from astropy import time
         from ztfquery import query
         zquery = query.ZTFQuery()

@@ -70,23 +70,23 @@ class MetaDataHandler( object ):
         if not hasattr(date, "__iter__"): # int/float given, convert to string
             date = str(date)
             
-        if type(date) is str:
+        if type(date) is str and len(date) == 6: # means per month as stored.
+            return cls.get_monthly_metadata(date[:4],date[4:])
+        elif type(date) is str
             start, end = parse_singledate(date) # -> start, end
         else:
             from astropy import time 
             start, end = time.Time(date, format=format).datetime
         # 
         # Now we have start and end in datetime format.
-        starting_month = "-".join(start.isoformat().split("-")[:2])
+        starting_month = [start.isoformat().split("-")[:2]]
         extra_months = pandas.date_range(start.isoformat(),
-                                         end.isoformat(), freq='MS'
-                                        ).strftime("%Y-%m").astype('str').str.split("-").to_list()
-        if len(extra_months)>0:
-            months = starting_month+extra_months
-            data = pandas.concat([cls.get_monthly_metadata(int(yyyy),int(mm)) for yyyy,mm in months])
-        else:
-            data = cls.get_monthly_metadata(int(starting_month[0]),int(starting_month[1]))
-                
+                                                 end.isoformat(), freq='MS'
+                                                 ).strftime("%Y-%m").astype('str').str.split("-").to_list()
+        # All individual months
+        months = np.unique(np.asarray(starting_month+extra_months, dtype="int"), axis=0)
+        data = pandas.concat([cls.get_monthly_metadata(int(yyyy),int(mm)) for yyyy,mm in months])
+        
         datecol = data["obsdate"].astype('datetime64')
         return data[datecol.between(start.isoformat(), end.isoformat())]
     

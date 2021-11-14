@@ -43,7 +43,6 @@ class MetaDataHandler( object ):
         # end test dask input
         #
 
-
         if not hasattr(date, "__iter__"): # int/float given, convert to string
             date = str(date)
 
@@ -56,9 +55,8 @@ class MetaDataHandler( object ):
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
-        delayed_data = [dask.delayed(cls.get_monthly_metadata)(yyyy,mm, force_dl=force_dl)
+        delayed_data = [dask.delayed(cls._load_or_download_)(yyyy,mm, force_dl=force_dl)
                     for yyyy,mm in months]
-        
 
         # Returns
         if as_dask == "delayed":
@@ -68,15 +66,14 @@ class MetaDataHandler( object ):
         
         if as_dask == "futures": # client has been tested already
             return client.compute(delayed_data)
+        
         if as_dask in ["gather","gathered"]:
             return client.gather(client.compute(delayed_data))
         
         raise ValueError("Cannot parse the given as_dask")
         
-        
-        
     @classmethod
-    def get_monthly_metadatafile(cls, year, month):
+    def get_monthly_metadatafile(cls, year, month, testexists=False, download=True):
         """ """
         from .io import get_directory
         year, month = int(year), int(month)
@@ -85,14 +82,20 @@ class MetaDataHandler( object ):
 
         directory = get_directory(cls._KIND, cls._SUBKIND)
         return os.path.join(directory, "meta", f"{cls._KIND}{cls._SUBKIND}_metadata_{year:04d}{month:02d}.parquet")
-    
+
     @classmethod
-    def get_monthly_metadata(cls, year, month, force_dl=False, **kwargs):
+    def _load_or_download_(cls, year, month, force_dl=False, **kwargs):
         """ """
         filepath = cls.get_monthly_metadatafile(year, month)
         if force_dl or not os.path.isfile(filepath):
-            cls.build_monthly_metadata(year, month)
-
+            filepath = cls.build_monthly_metadata(year, month)
+            
+        return filepath
+        
+    @classmethod
+    def get_monthly_metadata(cls, year, month, force_dl=False, **kwargs):
+        """ """
+        filepath = cls._load_or_download_(year, month, force_dl=force_dl)
         return pandas.read_parquet(filepath, **kwargs)
     
     @classmethod

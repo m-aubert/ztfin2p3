@@ -30,7 +30,7 @@ class MetaDataHandler( object ):
         return os.path.join(directory, "meta", f"{cls._KIND}{cls._SUBKIND}_metadata_{year:04d}{month:02d}.parquet")
     
     @classmethod
-    def get_monthly_metadata(cls, year, month, force_dl=False):
+    def get_monthly_metadata(cls, year, month, force_dl=False, **kwargs):
         """ """
         filepath = cls.get_monthly_metadatafile(year, month)
         if force_dl or not os.path.isfile(filepath):

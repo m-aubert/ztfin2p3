@@ -56,7 +56,7 @@ class MetaDataHandler( object ):
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
-        delayed_data = [dask.delayed(cls.get_monthly_metadata(yyyy,mm, force_dl=force_dl))
+        delayed_data = [dask.delayed(cls.get_monthly_metadata)(yyyy,mm, force_dl=force_dl)
                     for yyyy,mm in months]
         
 

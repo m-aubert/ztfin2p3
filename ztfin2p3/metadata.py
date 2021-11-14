@@ -107,15 +107,39 @@ class RawFlatMetaData( MetaDataHandler ):
         """ """
         from astropy import time
         from ztfquery import query
+        fileout = cls.get_monthly_metadatafile(year, month)
+        
         zquery = query.ZTFQuery()
         start, end = parse_singledate(f"{year:04d}{month:02d}")
-        start = time.Time(start)
-        end = time.Time(end)
+        start = time.Time(start.isoformat())
+        end = time.Time(end.isoformat())
 
         zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtypecode = 'f'")
-        if len(zquery.data)>10:
-            zquery.data.to_parquet(cls.get_yearly_metadatafile(year))
+        if len(zquery.data)>5:
+            zquery.data.to_parquet(fileout)
             
-        return 
+        return fileout
 
+class RawBiasMetaData( MetaDataHandler ):
+    _KIND = "raw"
+    _SUBKIND = "bias"
+    @classmethod
+    def build_monthly_metadata(cls, year, month):
+        """ """
+        from astropy import time
+        from ztfquery import query
+        fileout = cls.get_monthly_metadatafile(year, month)
+        
+        zquery = query.ZTFQuery()
+        start, end = parse_singledate(f"{year:04d}{month:02d}")
+        start = time.Time(start.isoformat())
+        end = time.Time(end.isoformat())
+
+        zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtypecode = 'b'")
+        if len(zquery.data)>5:
+            zquery.data.to_parquet(fileout)
+            
+        return fileout
+
+    
     

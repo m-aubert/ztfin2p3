@@ -23,6 +23,7 @@ class MetaDataHandler( object ):
     def get_monthly_metadatafile(cls, year, month):
         """ """
         from .io import get_directory
+        year, month = int(year), int(month)
         if cls._KIND is None or cls._SUBKIND is None:
             raise AttributeError(f"_KIND {cls._KIND} or _SUBKIND {cls._SUBKIND} is None. Please define them")
 
@@ -106,6 +107,7 @@ class RawFlatMetaData( MetaDataHandler ):
     @classmethod
     def build_monthly_metadata(cls, year, month):
         """ """
+        year, month = int(year), int(month)
         from astropy import time
         from ztfquery import query
         fileout = cls.get_monthly_metadatafile(year, month)
@@ -127,6 +129,7 @@ class RawBiasMetaData( MetaDataHandler ):
     @classmethod
     def build_monthly_metadata(cls, year, month):
         """ """
+        year, month = int(year), int(month)
         from astropy import time
         from ztfquery import query
         fileout = cls.get_monthly_metadatafile(year, month)

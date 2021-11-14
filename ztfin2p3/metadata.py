@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import pandas
+import warnings
 from .utils.tools import parse_singledate
             
 class MetaDataHandler( object ):
@@ -20,6 +21,59 @@ class MetaDataHandler( object ):
     # ================= #
     #   MetaData        #
     # ================= #
+    @classmethod
+    def bulk_build_metadata(cls, date, client=None, as_dask="delayed", force_dl=False):
+        """ uses Dask to massively download metadata in the given time range.
+        Data will be stored using the usual monthly based format. 
+
+        Example:
+        --------
+        To run the parallel downloading between May-12th of 2019 and June-3rd of 2020:
+        filesout = bulk_build_metadata(['2019-05-12','2020-06-03'], as_dask='computed')
+        
+        """
+        import dask
+        #
+        # - Test Dask input
+        if client is None:
+            if as_dask == "futures":
+                raise ValueError("Cannot as_dask=futures with client is None.")
+            if as_dask in ["gather","gathered"]:
+                as_dask = "computed"
+        # end test dask input
+        #
+
+
+        if not hasattr(date, "__iter__"): # int/float given, convert to string
+            date = str(date)
+
+        if type(date) is str and len(date) == 6: # means per month as stored.
+            return cls.get_monthly_metadata(date[:4],date[4:])
+        elif type(date) is str:
+            start, end = parse_singledate(date) # -> start, end
+        else:
+            from astropy import time 
+            start, end = time.Time(date, format=format).datetime
+
+        months = cls._daterange_to_monthlist_(start, end)
+        delayed_data = [dask.delayed(cls.get_monthly_metadata(int(yyyy),int(mm), force_dl=force_dl))
+                    for yyyy,mm in months]
+
+        # Returns
+        if as_dask == "delayed":
+            return delayed_data
+        if as_dask in ["compute","computed"]:
+            return dask.delayed(list)(delayed_data).compute()
+        
+        if as_dask == "futures": # client has been tested already
+            return client.compute(delayed_data)
+        if as_dask in ["gather","gathered"]:
+            return client.gather(client.compute(delayed_data))
+        
+        raise ValueError("Cannot parse the given as_dask")
+        
+        
+        
     @classmethod
     def get_monthly_metadatafile(cls, year, month):
         """ """
@@ -71,7 +125,7 @@ class MetaDataHandler( object ):
             raise ValueError("date cannot be None, could be string, float, or list of 2 strings")
         if not hasattr(date, "__iter__"): # int/float given, convert to string
             date = str(date)
-            
+
         if type(date) is str and len(date) == 6: # means per month as stored.
             return cls.get_monthly_metadata(date[:4],date[4:])
         elif type(date) is str:
@@ -79,14 +133,8 @@ class MetaDataHandler( object ):
         else:
             from astropy import time 
             start, end = time.Time(date, format=format).datetime
-        # 
-        # Now we have start and end in datetime format.
-        starting_month = [start.isoformat().split("-")[:2]]
-        extra_months = pandas.date_range(start.isoformat(),
-                                                 end.isoformat(), freq='MS'
-                                                 ).strftime("%Y-%m").astype('str').str.split("-").to_list()
-        # All individual months
-        months = np.unique(np.asarray(starting_month+extra_months, dtype="int"), axis=0)
+
+        months = cls._daterange_to_monthlist_(start, end)
         data = pandas.concat([cls.get_monthly_metadata(int(yyyy),int(mm)) for yyyy,mm in months])
         
         datecol = data["obsdate"].astype('datetime64')
@@ -100,7 +148,22 @@ class MetaDataHandler( object ):
         from ztfquery import query
         data = cls.get_metadata(date)
         return query.ZTFQuery(data, cls._KIND)
-        
+
+    # --------------- #
+    #  INTERNAL       #
+    # --------------- #
+    @staticmethod
+    def _daterange_to_monthlist_(start, end):
+        """ """
+        # 
+        # Now we have start and end in datetime format.
+        starting_month = [start.isoformat().split("-")[:2]]
+        extra_months = pandas.date_range(start.isoformat(),
+                                                 end.isoformat(), freq='MS'
+                                                 ).strftime("%Y-%m").astype('str').str.split("-").to_list()
+        # All individual months
+        return np.unique(np.asarray(starting_month+extra_months, dtype="int"), axis=0)
+    
                 
 class RawFlatMetaData( MetaDataHandler ):
     _KIND = "raw"

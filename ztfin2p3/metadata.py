@@ -56,8 +56,9 @@ class MetaDataHandler( object ):
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
-        delayed_data = [dask.delayed(cls.get_monthly_metadata(int(yyyy),int(mm), force_dl=force_dl))
+        delayed_data = [dask.delayed(cls.get_monthly_metadata(yyyy,mm, force_dl=force_dl))
                     for yyyy,mm in months]
+        
 
         # Returns
         if as_dask == "delayed":
@@ -135,7 +136,7 @@ class MetaDataHandler( object ):
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
-        data = pandas.concat([cls.get_monthly_metadata(int(yyyy),int(mm)) for yyyy,mm in months])
+        data = pandas.concat([cls.get_monthly_metadata(yyyy,mm) for yyyy,mm in months])
         
         datecol = data["obsdate"].astype('datetime64')
         return data[datecol.between(start.isoformat(), end.isoformat())]

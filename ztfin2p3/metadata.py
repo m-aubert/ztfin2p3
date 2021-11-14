@@ -22,7 +22,7 @@ class MetaDataHandler( object ):
     #   MetaData        #
     # ================= #
     @classmethod
-    def bulk_build_metadata(cls, date, client=None, as_dask="delayed", force_dl=False):
+    def bulk_build_metadata(cls, date, client=None, as_dask="delayed", force_dl=False, format=None):
         """ uses Dask to massively download metadata in the given time range.
         Data will be stored using the usual monthly based format. 
 

@@ -99,7 +99,7 @@ class MetaDataHandler( object ):
         return pandas.read_parquet(filepath, **kwargs)
     
     @classmethod
-    def get_metadata(cls, date, format=None):
+    def get_metadata(cls, date, ccdid=None, fid=None):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -121,10 +121,17 @@ class MetaDataHandler( object ):
                 - yyyymmdd: get the given single day (string of length 8)
                        e.g. date='20190227'
             
+        ccdid, fid: [int or list of]
+            value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
+            to limit to.
+
         Returns
         -------
         dataframe (IRSA metadata)
         """
+        #          #
+        #  Date    #
+        #          #
         if date is None:
             raise ValueError("date cannot be None, could be string, float, or list of 2 strings")
         if not hasattr(date, "__iter__"): # int/float given, convert to string
@@ -136,21 +143,36 @@ class MetaDataHandler( object ):
             start, end = parse_singledate(date) # -> start, end
         else:
             from astropy import time 
-            start, end = time.Time(date, format=format).datetime
+            start, end = time.Time(date).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
         data = pandas.concat([cls.get_monthly_metadata(yyyy,mm) for yyyy,mm in months])
         
         datecol = data["obsdate"].astype('datetime64')
-        return data[datecol.between(start.isoformat(), end.isoformat())]
+        data = data[datecol.between(start.isoformat(), end.isoformat())]
+        #          #
+        #  CCDID   #
+        #          #
+        if ccdid is not None:
+            data = data[data["ccdid"].isin(np.atleast_1d(ccdid))]
+        #          #
+        #  FID     #
+        #          #
+        if fid is not None:
+            data = data[data["fid"].isin(np.atleast_1d(fid))]
+
+        return data
     
     @classmethod
-    def get_zquery(cls, date, force_dl=False):
+    def get_zquery(cls, date, force_dl=False, **kwargs):
         """ get the ZTFQuery object associated to the metadata
         corresponding to the input date. 
+
+        **kwargs goes to get_metadata() like ccdid, fid 
+        
         """
         from ztfquery import query
-        data = cls.get_metadata(date)
+        data = cls.get_metadata(date, **kwargs)
         return query.ZTFQuery(data, cls._KIND)
 
     # --------------- #
@@ -172,6 +194,9 @@ class MetaDataHandler( object ):
 class RawFlatMetaData( MetaDataHandler ):
     _KIND = "raw"
     _SUBKIND = "flat"
+    # ================= #
+    #   To IMPLEMENT    #
+    # ================= #    
     @classmethod
     def build_monthly_metadata(cls, year, month):
         """ """
@@ -191,7 +216,50 @@ class RawFlatMetaData( MetaDataHandler ):
             
         return fileout
 
+    # ================= #
+    #   Super It        #
+    # ================= #    
+    @classmethod
+    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None):
+        """ General method to access the IRSA metadata given a date or a daterange. 
 
+        The format of date is very flexible to quickly get what you need:
+
+        Parameters
+        ----------
+        date: [string (or list of)]
+            date can either be a single string or a list of two dates in isoformat.
+            - two dates format: date=['start','end'] is isoformat
+              e.g. date=['2019-03-14','2019-03-25']
+            
+            - single string: four format are then accepted, year, month, week or day:
+                - yyyy: get the full year. (string of length 4)
+                       e.g. date='2019'
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+        ccdid, fid, ledid: [int or list of]
+            value or list of ccd (ccdid=[1->16]), filter (fid=[1->3]) or LED (2->13 | but 6)
+            to limit to.
+
+        Returns
+        -------
+        dataframe (IRSA metadata)
+        """
+        data = super.get_metadata(date, ccdid=ccdid, fid=fid)
+        if ledid is not None:
+            data = data[data["ledid"].isin(np.atleast_1d(ledid))]
+            
+        return data
+    
+    # ================= #
+    #   Additional      #
+    # ================= #    
+            
     @classmethod
     def add_ledinfo_to_metadata(cls, year, month, use_dask=True, update=False):
         """ """

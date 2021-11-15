@@ -316,5 +316,43 @@ class RawBiasMetaData( RawMetaData ):
 
 class RawScienceMetaData( RawMetaData ):
     _SUBKIND = "object"
-
     
+    @classmethod
+    def get_metadata(cls, date, ccdid=None, fid=None, field=None):
+        """ General method to access the IRSA metadata given a date or a daterange. 
+
+        The format of date is very flexible to quickly get what you need:
+
+        Parameters
+        ----------
+        date: [string (or list of)]
+            date can either be a single string or a list of two dates in isoformat.
+            - two dates format: date=['start','end'] is isoformat
+              e.g. date=['2019-03-14','2019-03-25']
+            
+            - single string: four format are then accepted, year, month, week or day:
+                - yyyy: get the full year. (string of length 4)
+                       e.g. date='2019'
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+        ccdid, fid: [int or list of]
+            value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3])
+            to limit to.
+
+        field: [int or list of]
+            requested (list of) field(s)
+ 
+        Returns
+        -------
+        dataframe (IRSA metadata)
+        """
+        data = super().get_metadata(date, ccdid=ccdid, fid=fid)
+        if fieldid is not None:
+            data = data[data["field"].isin(np.atleast_1d(field))]
+            
+        return data

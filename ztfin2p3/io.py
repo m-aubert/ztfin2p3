@@ -15,7 +15,7 @@ def get_rawfile(which, date, ccdid=None, fid=None,
         - flat
         - bias
         - starflat [not implemented yet]
-        - science [not implemented yet]
+        - science
         
     date: [string (or list of)]
             date can either be a single string or a list of two dates in isoformat.
@@ -50,7 +50,9 @@ def get_rawfile(which, date, ccdid=None, fid=None,
     **kwargs goes to get_metadata()
        option example:
        - which='flat': 
-           -ledid
+           - ledid
+       - which='science':
+           - field
 
     Returns
     -------
@@ -71,8 +73,12 @@ def get_rawfile(which, date, ccdid=None, fid=None,
     prop = dict(ccdid=ccdid, fid=fid, as_dask=as_dask, client=client)
     if which == "flat":
         return metadata.RawFlatMetaData.get_file(date, **{**prop, **kwargs})
+    
     if which == "bias":
         return metadata.RawBiasMetaData.get_file(date, **{**prop, **kwargs})
+    
+    if which in ["object","science"]:
+        return metadata.RawScienceMetaData.get_file(date, **{**prop, **kwargs})
 
     raise NotImplementedError(f"which = {which} has not been implemented yet.")
 

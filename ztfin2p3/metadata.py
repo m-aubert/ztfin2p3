@@ -352,7 +352,7 @@ class RawScienceMetaData( RawMetaData ):
         dataframe (IRSA metadata)
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid)
-        if fieldid is not None:
+        if field is not None:
             data = data[data["field"].isin(np.atleast_1d(field))]
             
         return data

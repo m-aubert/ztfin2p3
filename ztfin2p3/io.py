@@ -48,7 +48,7 @@ def get_rawfile(which, date, ccdid=None, fid=None,
 
 
     **kwargs goes to get_metadata()
-       option example:
+       option examples:
        - which='flat': 
            - ledid
        - which='science':

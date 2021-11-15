@@ -68,7 +68,7 @@ def get_rawfile(which, date, ccdid=None, fid=None,
     """
     from . import metadata
 
-    prop = dict(ccdid=ccdid, ledid=ledid, as_dask=as_dask, client=client)
+    prop = dict(ccdid=ccdid, fid=fid, as_dask=as_dask, client=client)
     if which == "flat":
         return metadata.RawFlatMetaData.get_file(date, **{**prop, **kwargs})
     if which == "bias":

@@ -67,8 +67,6 @@ def get_rawfile(which, date, ccdid=None, fid=None,
 
     """
     from .metadata import get_rawmeta
-    prop = dict(
-    
     return get_rawmeta(which=which, date=date, ccdid=ccdid, fid=fid,
                            as_dask=as_dask, client=client,
                            getwhat='file', **kwargs)

@@ -5,6 +5,79 @@ from ztfquery.io import LOCALSOURCE
 BASESOURCE = os.path.join(LOCALSOURCE, "ztfin2p3")
 
 
+
+
+def get_rawfile(which, date, ccdid=None, fid=None,
+                client=None, as_dask="computed",
+                **kwargs):
+    """ 
+    which: [string]
+        - flat
+        - bias
+        - starflat [not implemented yet]
+        - science [not implemented yet]
+        
+    date: [string (or list of)]
+            date can either be a single string or a list of two dates in isoformat.
+            - two dates format: date=['start','end'] is isoformat
+              e.g. date=['2019-03-14','2019-03-25']
+            
+            - single string: four format are then accepted, year, month, week or day:
+                - yyyy: get the full year. (string of length 4)
+                       e.g. date='2019'
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+    ccdid, fid: [int or list of] -optional-
+        value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
+        to limit to.
+
+
+    client: [Dask client] -optional-
+        provide the client that hold the dask cluster.
+
+    as_dask: [string] -optional-
+        what format of the data do you want.
+        - delayed
+        - futures
+        - computed (normal data)
+
+
+    **kwargs goes to get_metadata()
+       option example:
+       - which='flat': 
+           -ledid
+
+    Returns
+    -------
+    list
+
+    Example:
+    --------
+    #
+    # - Flat (with LEDID)
+    #
+    Get the rawflat image file of ledid #2 for the 23th week of
+    2020. Limit this to ccd #4
+    files = get_rawfile('flat', '2020023', ledid=2, ccdid=4)
+
+    """
+    from . import metadata
+
+    prop = dict(ccdid=ccdid, ledid=ledid, as_dask=as_dask, client=client)
+    if which == "flat":
+        return metadata.RawFlatMetaData.get_file(date, **{**prop, **kwargs})
+    if which == "bias":
+        return metadata.RawBiasMetaData.get_file(date, **{**prop, **kwargs})
+
+    raise NotImplementedError(f"which = {which} has not been implemented yet.")
+
+
+
 #########################
 #                       #
 #                       #

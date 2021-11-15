@@ -223,6 +223,10 @@ class RawMetaData( MetaDataHandler ):
 
         zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtype = '{cls._SUBKIND}'")
         if len(zquery.data)>5:
+            dirout = os.path.dirname(fileout)
+            if not os.path.isdir(dirout):
+                os.makedirs(dirout, exist_ok=True)
+                
             zquery.data.to_parquet(fileout)
             
         return fileout

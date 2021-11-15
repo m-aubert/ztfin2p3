@@ -85,9 +85,12 @@ def get_rawfile(which, date, ccdid=None, fid=None,
 #                       #
 #                       #
 #########################
+# Calibration
 BIAS_DIR = os.path.join(BASESOURCE, "cal/bias")
 FLAT_DIR = os.path.join(BASESOURCE, "cal/flat")
 STARFLAT_DIR = os.path.join(BASESOURCE, "cal/starflat")
+# Science
+SCIENCE_DIR = os.path.join(BASESOURCE, "sci")
 
 def get_directory(kind, subkind):
     """ """
@@ -97,7 +100,9 @@ def get_directory(kind, subkind):
         return BIAS_DIR
     if subkind == "starflat":
         return STARFLAT_DIR
-        
+    if subkind in ["object","science"]:
+        return SCIENCE_DIR
+    
 # =========== #
 #  BIAS       #
 # =========== #

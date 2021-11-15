@@ -70,7 +70,7 @@ def get_rawmeta(which, date, ccdid=None, fid=None,
 
     """
     prop = dict(ccdid=ccdid, fid=fid)
-    method = f"get_{whatmeta}"
+    method = f"get_{getwhat}"
 
     if which == "flat":
         class_ = RawFlatMetaData

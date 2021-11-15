@@ -250,7 +250,7 @@ class RawFlatMetaData( MetaDataHandler ):
         -------
         dataframe (IRSA metadata)
         """
-        data = super.get_metadata(date, ccdid=ccdid, fid=fid)
+        data = super().get_metadata(date, ccdid=ccdid, fid=fid)
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
             

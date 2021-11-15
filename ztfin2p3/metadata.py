@@ -202,16 +202,15 @@ class MetaDataHandler( object ):
         # All individual months
         return np.unique(np.asarray(starting_month+extra_months, dtype="int"), axis=0)
     
-                
-class RawFlatMetaData( MetaDataHandler ):
+class RawMetaData( MetaDataHandler ):
     _KIND = "raw"
-    _SUBKIND = "flat"
-    # ================= #
-    #   To IMPLEMENT    #
-    # ================= #    
+    _SUBKIND = None
     @classmethod
     def build_monthly_metadata(cls, year, month):
         """ """
+        if cls._SUBKIND is None:
+            raise NotImplementedError("you must define cls._SUBKIND")
+        
         year, month = int(year), int(month)
         from astropy import time
         from ztfquery import query
@@ -222,12 +221,14 @@ class RawFlatMetaData( MetaDataHandler ):
         start = time.Time(start.isoformat())
         end = time.Time(end.isoformat())
 
-        zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtypecode = 'f'")
+        zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtype = '{cls._SUBKIND}'")
         if len(zquery.data)>5:
             zquery.data.to_parquet(fileout)
             
         return fileout
-
+    
+class RawFlatMetaData( RawMetaData ):
+    _SUBKIND = "flat"
     # ================= #
     #   Super It        #
     # ================= #    
@@ -271,7 +272,6 @@ class RawFlatMetaData( MetaDataHandler ):
     # ================= #
     #   Additional      #
     # ================= #    
-            
     @classmethod
     def add_ledinfo_to_metadata(cls, year, month, use_dask=True, update=False):
         """ """
@@ -307,28 +307,10 @@ class RawFlatMetaData( MetaDataHandler ):
         return
         
         
-
-class RawBiasMetaData( MetaDataHandler ):
-    _KIND = "raw"
+class RawBiasMetaData( RawMetaData ):
     _SUBKIND = "bias"
-    @classmethod
-    def build_monthly_metadata(cls, year, month):
-        """ """
-        year, month = int(year), int(month)
-        from astropy import time
-        from ztfquery import query
-        fileout = cls.get_monthly_metadatafile(year, month)
-        
-        zquery = query.ZTFQuery()
-        start, end = parse_singledate(f"{year:04d}{month:02d}")
-        start = time.Time(start.isoformat())
-        end = time.Time(end.isoformat())
 
-        zquery.load_metadata("raw", sql_query=f"obsjd between {start.jd} and {end.jd} and imgtypecode = 'b'")
-        if len(zquery.data)>5:
-            zquery.data.to_parquet(fileout)
-            
-        return fileout
+class RawScienceMetaData( RawMetaData ):
+    _SUBKIND = "object"
 
-    
     

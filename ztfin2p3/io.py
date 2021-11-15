@@ -5,10 +5,8 @@ from ztfquery.io import LOCALSOURCE
 BASESOURCE = os.path.join(LOCALSOURCE, "ztfin2p3")
 
 
-
-
 def get_rawfile(which, date, ccdid=None, fid=None,
-                client=None, as_dask="computed",
+                client=None, as_dask="computed", whatfile='file',
                 **kwargs):
     """ 
     which: [string]
@@ -68,21 +66,12 @@ def get_rawfile(which, date, ccdid=None, fid=None,
     files = get_rawfile('flat', '2020023', ledid=2, ccdid=4)
 
     """
-    from . import metadata
-
-    prop = dict(ccdid=ccdid, fid=fid, as_dask=as_dask, client=client)
-    if which == "flat":
-        return metadata.RawFlatMetaData.get_file(date, **{**prop, **kwargs})
+    from .metadata import get_rawmeta
+    prop = dict(
     
-    if which == "bias":
-        return metadata.RawBiasMetaData.get_file(date, **{**prop, **kwargs})
-    
-    if which in ["object","science"]:
-        return metadata.RawScienceMetaData.get_file(date, **{**prop, **kwargs})
-
-    raise NotImplementedError(f"which = {which} has not been implemented yet.")
-
-
+    return get_rawmeta(which=which, date=date, ccdid=ccdid, fid=fid,
+                           as_dask=as_dask, client=client,
+                           getwhat='file', **kwargs)
 
 #########################
 #                       #

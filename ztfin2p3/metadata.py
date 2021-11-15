@@ -5,7 +5,88 @@ import numpy as np
 import pandas
 import warnings
 from .utils.tools import parse_singledate
+
+def get_rawmeta(which, date, ccdid=None, fid=None,
+                getwhat='metadata',
+                **kwargs):
+    """ 
+    which: [string]
+        - flat
+        - bias
+        - starflat [not implemented yet]
+        - science
+        
+    date: [string (or list of)]
+            date can either be a single string or a list of two dates in isoformat.
+            - two dates format: date=['start','end'] is isoformat
+              e.g. date=['2019-03-14','2019-03-25']
             
+            - single string: four format are then accepted, year, month, week or day:
+                - yyyy: get the full year. (string of length 4)
+                       e.g. date='2019'
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+    ccdid, fid: [int or list of] -optional-
+        value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
+        to limit to.
+
+
+    getwhat: [string] -optional-
+        what do you want to get. get_{getwhat} must be an existing
+        method. You have for instance:
+        - file
+        - metadata
+        - zquery
+
+        
+    **kwargs goes to get_metadata()
+       option examples:
+       - which='flat': 
+           - ledid
+       - which='science':
+           - field
+
+       - getwhat = 'file':
+           - client, 
+           - as_dask
+
+    Returns
+    -------
+    list
+
+    Example:
+    --------
+    #
+    # - Flat (with LEDID)
+    #
+    Get the rawflat image file of ledid #2 for the 23th week of
+    2020. Limit this to ccd #4
+    files = get_rawfile('flat', '2020023', ledid=2, ccdid=4)
+
+    """
+    prop = dict(ccdid=ccdid, fid=fid)
+    method = f"get_{whatmeta}"
+
+    if which == "flat":
+        class_ = RawFlatMetaData
+    elif which == "bias":
+        class_ = RawBiasMetaData
+    elif which in ["object","science"]:
+        class_ = RawScienceMetaData
+    else:
+        raise NotImplementedError(f"which = {which} has not been")
+
+    return getattr(class_,method)(date, **{**prop, **kwargs})
+
+
+
+
+
 class MetaDataHandler( object ):
     _KIND = None # IRSA kind: raw, sci, cal
     _SUBKIND = None # subkind (raw/{flat,bias,science,starflat}, etc.)

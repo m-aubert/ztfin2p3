@@ -208,7 +208,7 @@ class RawFlatMetaData( MetaDataHandler ):
             return
         
         # Only get the first filefracday index, since all filefactday have the same LED.
-        filefracdays= zquery.data.groupby("filefracday").head(1)
+        filefracdays= zquery.data[zquery.data["fid"].isin([1,2,3])].groupby("filefracday").head(1)
         # Get the LEDID
         files = [l.split("/")[-1] for l in zquery.get_data_path(indexes=filefracdays.index)]
         if use_dask:

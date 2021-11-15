@@ -22,82 +22,16 @@ class MetaDataHandler( object ):
     #   MetaData        #
     # ================= #
     @classmethod
-    def bulk_build_metadata(cls, date, client=None, as_dask="delayed", force_dl=False, format=None):
-        """ uses Dask to massively download metadata in the given time range.
-        Data will be stored using the usual monthly based format. 
+    def get_file(cls, date, client=None, as_dask="futures", **kwargs):
+        """ get the file associated to the input metadata limits. 
 
-        Example:
-        --------
-        To run the parallel downloading between May-12th of 2019 and June-3rd of 2020:
-        filesout = bulk_build_metadata(['2019-05-12','2020-06-03'], as_dask='computed')
-        
+        **kwargs goes to get_metadata, it contains selection options like ccdid or fid.
         """
-        import dask
-        #
-        # - Test Dask input
-        if client is None:
-            if as_dask == "futures":
-                raise ValueError("Cannot as_dask=futures with client is None.")
-            if as_dask in ["gather","gathered"]:
-                as_dask = "computed"
-        # end test dask input
-        #
-
-        if not hasattr(date, "__iter__"): # int/float given, convert to string
-            date = str(date)
-
-        if type(date) is str and len(date) == 6: # means per month as stored.
-            return cls.get_monthly_metadata(date[:4],date[4:])
-        elif type(date) is str:
-            start, end = parse_singledate(date) # -> start, end
-        else:
-            from astropy import time 
-            start, end = time.Time(date, format=format).datetime
-
-        months = cls._daterange_to_monthlist_(start, end)
-        delayed_data = [dask.delayed(cls._load_or_download_)(yyyy,mm, force_dl=force_dl)
-                    for yyyy,mm in months]
-
-        # Returns
-        if as_dask == "delayed":
-            return delayed_data
-        if as_dask in ["compute","computed"]:
-            return dask.delayed(list)(delayed_data).compute()
+        from ztfquery import io
+        zquery = cls.get_zquery(date,**kwargs)
+        files = zquery.get_data_path()
+        return io.bulk_get_file(files, client=client, as_dask=as_dask)
         
-        if as_dask == "futures": # client has been tested already
-            return client.compute(delayed_data)
-        
-        if as_dask in ["gather","gathered"]:
-            return client.gather(client.compute(delayed_data))
-        
-        raise ValueError("Cannot parse the given as_dask")
-        
-    @classmethod
-    def get_monthly_metadatafile(cls, year, month):
-        """ """
-        from .io import get_directory
-        year, month = int(year), int(month)
-        if cls._KIND is None or cls._SUBKIND is None:
-            raise AttributeError(f"_KIND {cls._KIND} or _SUBKIND {cls._SUBKIND} is None. Please define them")
-
-        directory = get_directory(cls._KIND, cls._SUBKIND)
-        return os.path.join(directory, "meta", f"{cls._KIND}{cls._SUBKIND}_metadata_{year:04d}{month:02d}.parquet")
-
-    @classmethod
-    def _load_or_download_(cls, year, month, force_dl=False, **kwargs):
-        """ """
-        filepath = cls.get_monthly_metadatafile(year, month)
-        if force_dl or not os.path.isfile(filepath):
-            filepath = cls.build_monthly_metadata(year, month)
-            
-        return filepath
-        
-    @classmethod
-    def get_monthly_metadata(cls, year, month, force_dl=False, **kwargs):
-        """ """
-        filepath = cls._load_or_download_(year, month, force_dl=force_dl)
-        return pandas.read_parquet(filepath, **kwargs)
-    
     @classmethod
     def get_metadata(cls, date, ccdid=None, fid=None):
         """ General method to access the IRSA metadata given a date or a daterange. 
@@ -174,6 +108,84 @@ class MetaDataHandler( object ):
         from ztfquery import query
         data = cls.get_metadata(date, **kwargs)
         return query.ZTFQuery(data, cls._KIND)
+    
+    @classmethod
+    def bulk_build_metadata(cls, date, client=None, as_dask="delayed", force_dl=False, format=None):
+        """ uses Dask to massively download metadata in the given time range.
+        Data will be stored using the usual monthly based format. 
+
+        Example:
+        --------
+        To run the parallel downloading between May-12th of 2019 and June-3rd of 2020:
+        filesout = bulk_build_metadata(['2019-05-12','2020-06-03'], as_dask='computed')
+        
+        """
+        import dask
+        #
+        # - Test Dask input
+        if client is None:
+            if as_dask == "futures":
+                raise ValueError("Cannot as_dask=futures with client is None.")
+            if as_dask in ["gather","gathered"]:
+                as_dask = "computed"
+        # end test dask input
+        #
+
+        if not hasattr(date, "__iter__"): # int/float given, convert to string
+            date = str(date)
+
+        if type(date) is str and len(date) == 6: # means per month as stored.
+            return cls.get_monthly_metadata(date[:4],date[4:])
+        elif type(date) is str:
+            start, end = parse_singledate(date) # -> start, end
+        else:
+            from astropy import time 
+            start, end = time.Time(date, format=format).datetime
+
+        months = cls._daterange_to_monthlist_(start, end)
+        delayed_data = [dask.delayed(cls._load_or_download_)(yyyy,mm, force_dl=force_dl)
+                    for yyyy,mm in months]
+
+        # Returns
+        if as_dask == "delayed":
+            return delayed_data
+        if as_dask in ["compute","computed"]:
+            return dask.delayed(list)(delayed_data).compute()
+        
+        if as_dask == "futures": # client has been tested already
+            return client.compute(delayed_data)
+        
+        if as_dask in ["gather","gathered"]:
+            return client.gather(client.compute(delayed_data))
+        
+        raise ValueError("Cannot parse the given as_dask")
+        
+    @classmethod
+    def get_monthly_metadatafile(cls, year, month):
+        """ """
+        from .io import get_directory
+        year, month = int(year), int(month)
+        if cls._KIND is None or cls._SUBKIND is None:
+            raise AttributeError(f"_KIND {cls._KIND} or _SUBKIND {cls._SUBKIND} is None. Please define them")
+
+        directory = get_directory(cls._KIND, cls._SUBKIND)
+        return os.path.join(directory, "meta", f"{cls._KIND}{cls._SUBKIND}_metadata_{year:04d}{month:02d}.parquet")
+
+    @classmethod
+    def _load_or_download_(cls, year, month, force_dl=False, **kwargs):
+        """ """
+        filepath = cls.get_monthly_metadatafile(year, month)
+        if force_dl or not os.path.isfile(filepath):
+            filepath = cls.build_monthly_metadata(year, month)
+            
+        return filepath
+        
+    @classmethod
+    def get_monthly_metadata(cls, year, month, force_dl=False, **kwargs):
+        """ """
+        filepath = cls._load_or_download_(year, month, force_dl=force_dl)
+        return pandas.read_parquet(filepath, **kwargs)
+    
 
     # --------------- #
     #  INTERNAL       #

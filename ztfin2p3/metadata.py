@@ -73,7 +73,7 @@ class MetaDataHandler( object ):
         raise ValueError("Cannot parse the given as_dask")
         
     @classmethod
-    def get_monthly_metadatafile(cls, year, month, testexists=False, download=True):
+    def get_monthly_metadatafile(cls, year, month):
         """ """
         from .io import get_directory
         year, month = int(year), int(month)
@@ -190,6 +190,43 @@ class RawFlatMetaData( MetaDataHandler ):
             zquery.data.to_parquet(fileout)
             
         return fileout
+
+
+    @classmethod
+    def add_ledinfo_to_metadata(cls, year, month, use_dask=True, update=False):
+        """ """
+        year, month = int(year), int(month)
+        from ztfquery import io
+        from astropy.io import fits
+        def getval_from_header(filename, value, ext=None, **kwargs):
+            """ """
+            return fits.getval(io.get_file(filename, **kwargs),  value, ext=ext)
+
+        zquery = cls.get_zquery(f"{year:04d}{month:02d}")
+        if "ledid" in zquery.data.columns:
+            warnings.warn("ledid already in data. update=False so nothing to do")
+            return
+        
+        # Only get the first filefracday index, since all filefactday have the same LED.
+        filefracdays= zquery.data.groupby("filefracday").head(1)
+        # Get the LEDID
+        files = [l.split("/")[-1] for l in zquery.get_data_path(indexes=filefracdays.index)]
+        if use_dask:
+            import dask
+            ilum_delayed = [dask.delayed(getval_from_header)(file_, "ILUM_LED")  for file_ in files]
+            ilum = dask.delayed(list)(ilum_delayed).compute()
+        else:
+            ilum = [getval_from_header(file_, "ILUM_LED")  for file_ in files]
+
+        # merge that with the initial data.            
+        filefracdays.insert(len(filefracdays.columns), "ledid", ilum)
+        data = zquery.data.merge(filefracdays[["filefracday","ledid"]], on="filefracday")
+        # and store it back.
+        fileout = cls.get_monthly_metadatafile(year, month)
+        data.to_parquet(fileout)
+        return
+        
+        
 
 class RawBiasMetaData( MetaDataHandler ):
     _KIND = "raw"

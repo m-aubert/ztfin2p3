@@ -36,3 +36,16 @@ def parse_singledate(date):
         raise ValueError(f"Cannot parse the input single date format {date}, size 6(yyyymm), 7(yyyywww) or 8(yyyymmdd) expected")
         
     return date_start, date_end
+
+def header_from_files(files, keys, refheader_id=0, inputkey="INPUT"):
+    """ """
+    header = fits.getheader(files[refheader_id])
+    newheader = fits.Header()
+    for k_ in keys:
+        newheader.set(k_, header.get(k_,""), header.comments[k_])
+        
+    basenames = [l.split("/")[-1] for l in files]
+    for i, basename_ in enumerate(basenames):
+        newheader.set(f"{inputkey}{i:02d}",basename_, "input image")
+        
+    return newheader

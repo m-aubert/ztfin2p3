@@ -91,7 +91,7 @@ class FlatBuilder( object ): # /day /week /month
         self.set_data(data)
         return data
 
-    def build_header(self, keys=None):
+    def build_header(self, keys=None, refid=0):
         """ """
         from astropy.io import fits
 
@@ -101,7 +101,7 @@ class FlatBuilder( object ): # /day /week /month
                     "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
                     "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
                 
-        header = self.imgcollection.images[refheader_id].header.compute()
+        header = self.imgcollection.images[refid].header.compute()
         newheader = fits.Header()
         for k_ in keys:
             newheader.set(k_, header.get(k_,""), header.comments[k_])

@@ -64,6 +64,10 @@ class FlatBuilder( object ): # /day /week /month
         # -- Data saving
         hdul.append( PrimaryHDU(self.data, fitsheader) )            
         hdulist = HDUList(hdul)
+        dirout = os.path.dirname(fileout)
+        if not os.path.isdir(dirout):
+            os.makedirs(dirout, exist_ok=True)
+            
         hdulist.writeto(fileout, overwrite=overwrite)
         
     # ============== #

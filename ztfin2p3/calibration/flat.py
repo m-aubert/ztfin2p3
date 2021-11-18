@@ -83,11 +83,11 @@ class FlatBuilder( object ): # /day /week /month
     # -------- # 
     # BUILDER  #
     # -------- #
-    def build(self, corr_nl=True, corr_overscan=True, **kwargs):
+    def build(self, corr_nl=True, corr_overscan=True, clipping=True, **kwargs):
         """ """
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl),
+        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
                 **kwargs}
-        data = self.imgcollection.get_data_robustmean(**prop)
+        data = self.imgcollection.get_data_mean(**prop)
         self.set_data(data)
 
     def build_header(self, keys=None):
@@ -100,7 +100,7 @@ class FlatBuilder( object ): # /day /week /month
                     "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
                     "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
                 
-        header = fits.getheader(files[refheader_id])
+        header = fb.imgcollection.images[refheader_id].header.compute()
         newheader = fits.Header()
         for k_ in keys:
             newheader.set(k_, header.get(k_,""), header.comments[k_])

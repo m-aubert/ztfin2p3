@@ -25,7 +25,7 @@ def build_weeklyflat(year, week, ccdid, filtername, ledid=None,
     return buildflat_from_files(files, fileout, **kwargs)
 
 
-def buildflat_from_files(files, fileout, **kwargs)
+def buildflat_from_files(files, fileout, **kwargs):
     """ """
     flat = FlatBuilder.from_rawfiles(files)
     flat.build(**kwargs)

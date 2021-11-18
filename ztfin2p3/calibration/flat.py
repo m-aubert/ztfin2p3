@@ -51,25 +51,18 @@ class FlatBuilder( object ): # /day /week /month
     def from_rawfiles(cls, rawfiles, **kwargs):
         """ """
         from ztfimg import raw
-        self._inputfiles = rawfiles
         flatcollection = raw.RawFlatCCDCollection.from_filenames(rawfiles, **kwargs)
         return cls(flatcollection)
 
     def to_fits(self, fileout, overwrite=True):
         """ Store the data in fits format """
-        from astropy.io.fits import HDUList, Header
-        from astropy.io.fits import PrimaryHDU, ImageHDU
+
+        from astropy.io.fits import HDUList, PrimaryHDU
         fitsheader = self.build_header()
         
         hdul = []
         # -- Data saving
-        hdul.append( PrimaryHDU(self.flux, fitsheader) )
-        if self.has_error():
-            hdul.append( ImageHDU(self.error, name='ERROR') )
-
-        if not self._is_lbdastep_constant_():
-            hdul.append( ImageHDU(self.lbda, name='LBDA') )
-            
+        hdul.append( PrimaryHDU(self.data, fitsheader) )            
         hdulist = HDUList(hdul)
         hdulist.writeto(fileout, overwrite=overwrite)
         
@@ -99,6 +92,7 @@ class FlatBuilder( object ): # /day /week /month
 
     def build_header(self, keys=None):
         """ """
+        from astropy.io import fits
         raise NotImplementedError("This method is not finished yet.")
         if keys is None:
             keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",

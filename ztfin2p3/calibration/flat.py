@@ -93,7 +93,7 @@ class FlatBuilder( object ): # /day /week /month
     def build_header(self, keys=None):
         """ """
         from astropy.io import fits
-        raise NotImplementedError("This method is not finished yet.")
+
         if keys is None:
             keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
                     "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
@@ -105,11 +105,12 @@ class FlatBuilder( object ): # /day /week /month
         for k_ in keys:
             newheader.set(k_, header.get(k_,""), header.comments[k_])
             
-        basenames = [l.split("/")[-1] for l in files]
+        basenames = self.imgcollection.filenames
         for i, basename_ in enumerate(basenames):
             newheader.set(f"INPUT{i:02d}",basename_, "input image")
             
         return newheader
+    
     # ============== #
     #  Properties    # 
     # ============== #

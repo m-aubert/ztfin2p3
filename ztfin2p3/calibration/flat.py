@@ -89,6 +89,7 @@ class FlatBuilder( object ): # /day /week /month
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
         self.set_data(data)
+        return data
 
     def build_header(self, keys=None):
         """ """

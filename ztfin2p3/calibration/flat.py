@@ -40,7 +40,7 @@ def buildflat_from_files(files, fileout, **kwargs):
     
 class FlatBuilder( object ): # /day /week /month
 
-    def __init__(cls, rawflatcollection):
+    def __init__(self, rawflatcollection):
         """ """
         self.set_imgcollection(rawflatcollection)
         

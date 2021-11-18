@@ -129,7 +129,7 @@ class FlatBuilder( object ): # /day /week /month
     @property
     def data(self):
         """ """
-        if not hasattr(self, "_data")
+        if not hasattr(self, "_data"):
             return None
         
         return self._data

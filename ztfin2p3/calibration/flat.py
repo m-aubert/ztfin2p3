@@ -9,21 +9,22 @@ import numpy as np
 def build_dailyflat(year, month, day, ccdid, filtername, ledid=None, 
                    **kwargs):
     """ """
+    from ..io import get_rawfile, get_daily_flatfile
     year, month, day = int(year), int(month), int(day)
-    files = io.get_rawfile("flat", f"{year:04d}{month:02d}{day:02d}", ccdid=ccdid, ledid=ledid)
-    fileout = io.get_daily_flatfile(year, month, day, ccdid, filtername, ledid=ledid)
+    files = get_rawfile("flat", f"{year:04d}{month:02d}{day:02d}", ccdid=ccdid, ledid=ledid)
+    fileout = get_daily_flatfile(year, month, day, ccdid, filtername, ledid=ledid)
     # Actual builds
     return buildflat_from_files(files, fileout, **kwargs)
 
 def build_weeklyflat(year, week, ccdid, filtername, ledid=None, 
                    **kwargs):
     """ """
+    from ..io import get_rawfile, get_daily_flatfileget_weekly_flatfile
     year, week = int(year), int(week)
-    files = io.get_rawfile("flat", f"{year:04d}{week:03d}", ccdid=ccdid, ledid=ledid)
-    fileout = io.get_weekly_flatfile(year, week, ccdid, filtername, ledid=ledid)
+    files = get_rawfile("flat", f"{year:04d}{week:03d}", ccdid=ccdid, ledid=ledid)
+    fileout = get_weekly_flatfile(year, week, ccdid, filtername, ledid=ledid)
     # Actual builds
     return buildflat_from_files(files, fileout, **kwargs)
-
 
 def buildflat_from_files(files, fileout, **kwargs):
     """ """

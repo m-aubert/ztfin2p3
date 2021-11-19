@@ -54,11 +54,12 @@ class FlatBuilder( object ): # /day /week /month
         flatcollection = raw.RawFlatCCDCollection.from_filenames(rawfiles, **kwargs)
         return cls(flatcollection)
 
-    def to_fits(self, fileout, overwrite=True):
+    def to_fits(self, fileout, header=None, overwrite=True):
         """ Store the data in fits format """
 
         from astropy.io.fits import HDUList, PrimaryHDU
-        fitsheader = self.build_header()
+        if header is None:
+            fitsheader = self.build_header()
         
         hdul = []
         # -- Data saving
@@ -83,7 +84,10 @@ class FlatBuilder( object ): # /day /week /month
     def set_data(self, data):
         """ """
         self._data = data
-        
+
+    def set_header(self, header):
+        """ """
+        self._header = header
     # -------- # 
     # BUILDER  #
     # -------- #
@@ -92,6 +96,8 @@ class FlatBuilder( object ): # /day /week /month
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
+        
+        
         self.set_data(data)
         return data
 
@@ -104,13 +110,16 @@ class FlatBuilder( object ): # /day /week /month
                     "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
                     "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
                     "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-                
-        header = self.imgcollection.images[refid].header.compute()
-        newheader = fits.Header()
-        for k_ in keys:
-            newheader.set(k_, header.get(k_,""), header.comments[k_])
 
+        header = self.imgcollection.get_singleheader(refid)
+        if type(header) == dask.dataframe.core.Series:
+            header = header.compute()
+
+        header = header.loc[keys]
+            
+        newheader = fits.Header(serie.loc[keys].to_dict())
         newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
+        
         if inclinput:
             basenames = self.imgcollection.filenames
             for i, basename_ in enumerate(basenames):

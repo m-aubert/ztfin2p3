@@ -5,6 +5,7 @@ import pandas
 import numpy as np
 import dask
 
+from astropy.io import fits
 
 def bulk_buildflat(dates, ccdid, filtername, ledid=None):
     """ """

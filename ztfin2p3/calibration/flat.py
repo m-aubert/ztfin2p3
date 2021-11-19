@@ -45,6 +45,7 @@ def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite
 
 class Flat( _Image_ ):
     SHAPE = 6160, 6144
+    QUADRANT_SHAPE = 3080, 3072
     def __init__(self, data, header=None, use_dask=True):
         """ """
         _ = super().__init__(use_dask=use_dask)
@@ -85,6 +86,29 @@ class Flat( _Image_ ):
         bflat = FlatBuilder.from_rawfiles(rawfiles, persist=False)
         data, header = bflat.build(set_it=False, **kwargs)
         return cls(data, header=None, use_dask=True)
+
+    # ============== #
+    #  Method        # 
+    # ============== #
+    def get_quadrant_data(self, qid, **kwargs):
+        """ **kwargs goes to get_data() this then split the data """
+        qid = int(qid)
+        dataccd = self.get_data(**kwargs)
+        # this accounts for all rotation and rebin did before
+        qshape = np.asarray(dataccd.shape)/2. 
+
+        if qid == 0:
+            data_ = dataccd[qshape[0]:, qshape[1]:]
+        elif qid == 1:
+            data_ = dataccd[qshape[0]:, :qshape[1]]
+        elif qid == 2:
+            data_ = dataccd[:qshape[0], :qshape[1]]
+        elif qid == 3:
+            data_ = dataccd[:qshape[0], qshape[1]:]
+        else:
+            raise ValueError(f"qid must be 0,1,2 or 3 {qid} given")
+        
+        return data_
         
 # ==================== #
 #                      #

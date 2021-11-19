@@ -4,8 +4,12 @@ import os
 import pandas
 import numpy as np
 import dask
+import dask.array as da
 
 from astropy.io import fits
+
+
+from ztfimg.base import _Image_
 
 def bulk_buildflat(dates, ccdid, filtername, ledid=None, **kwargs):
     """ """
@@ -27,7 +31,7 @@ def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite
 
     # 
     # Data 
-    bflat = FlatBuilder.from_rawfiles(files)
+    bflat = FlatBuilder.from_rawfiles(files, persist=False)
     data, header = bflat.build(set_it=False, **kwargs)
     
     # 
@@ -37,20 +41,46 @@ def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite
         return dask.delayed(fits.writeto)(fileout, data, header=header, overwrite=overwrite)
     return fits.writeto(fileout, data, header=header, overwrite=overwrite)
     
-
-    
-    
     
 
-    
-    
+class Flat( _Image_ ):
+    SHAPE = 6160, 6144
+    def __init__(self, data, header=None, use_dask=True):
+        """ """
+        _ = super().__init__(use_dask=use_dask)
+        self.set_data(data)
+        if header is not None:
+            self.set_header(header)
 
+    @classmethod
+    def from_filename(cls, filename, use_dask=True):
+        """ this first uses ztfquery.io.get_file() then call read_fits() 
+        directly use read_fits() if you have the input data already is a full path.
+        """
+        from ztfquery import io
+        fitsfile = io.get_file(filename)
+        return cls.read_fits(fitsfile)
+    
+    @classmethod
+    def read_fits(cls, fitsfile, use_dask=True):
+        """ """
+        if use_dask:
+            data = da.delayed( dask.delayed(fits.getdata)(filstile),
+                                shape=cls.SHAPE, dtype="float")
+            header= dask.delayed(fits.getheader)(filstile)
+        else:
+            data = fits.getdata(filstile)
+            header= fits.getheader(filstile)
+
+        this = cls(data=data, header=header, use_dask=use_dask)
+        this._filename = filename
+        return this
+        
 # ==================== #
 #                      #
 #   Flat Builder       #
 #                      #
-# ==================== #
-    
+# ==================== #    
 class FlatBuilder( object ): # /day /week /month
 
     def __init__(self, rawflatcollection):

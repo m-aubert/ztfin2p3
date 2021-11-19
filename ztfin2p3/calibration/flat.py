@@ -73,7 +73,7 @@ class Flat( _Image_ ):
             header= fits.getheader(fitsfile)
 
         this = cls(data=data, header=header, use_dask=use_dask)
-        this._filename = filename
+        this._filename = fitsfile
         return this
         
 # ==================== #

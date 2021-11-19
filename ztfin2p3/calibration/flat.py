@@ -29,18 +29,18 @@ def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
-    if ccdid is None or ccdid in ["*","all"]
+    if ccdid is None or ccdid in ["*","all"]:
         ccdid = np.arange(1,17)
     else:
         ccdid = np.atleast_1d(ccdid)
         
     if ledid is None or ledid in ["*","all"]:
-        ledid = np.concatenate(list(flat.LED_FILTER.values()))
+        ledid = np.concatenate( list(LED_FILTER.values()) )
     else:
         ledid = np.atleast_1d(ledid)
         
-    return [build_flat(str(date_),  delay_store=True, persist_file=persist_file,
-                        ccdid=int(ccdid_), ledid=int(ledid_), **kwargs)
+    return [build_flat(str(date_), ccdid=int(ccdid_), ledid=int(ledid_),
+                           delay_store=True, persist_file=persist_file, **kwargs)
                 for ccdid_ in ccdid
                 for ledid_ in ledid
                 for date_ in dates]

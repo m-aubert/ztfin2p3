@@ -6,9 +6,25 @@ import numpy as np
 import dask
 
 
-def bulk_buildflats(dates, ccdid)
+def bulk_buildflat(dates, ccdid, filtername, ledid=None):
+    """ """
+    dates = np.atleast_1d(dates)
 
-def build_dailyflat(year, month, day, ccdid, filtername, ledid=None, 
+    prop = dict(ccdid=ccdid, filtername=filtername, ledid=ledid)
+    outputs = []
+    for date in dates:
+        if len(date)==7:
+            outputs.append( build_weeklyflat( date[:4],date[4:], **prop) )
+        elif len(date)==8:
+            outputs.append( build_dailyflat( date[:4],date[4:6],date[6:] **prop) )
+        else:
+            warnings.warn(f"Cannot parse date={date} ; yyyywww or yyyymmdd | ignored.")
+            
+    return outputs
+
+
+def build_dailyflat(year, month, day, ccdid, filtername, ledid=None,
+                    delay_store=False,
                    **kwargs):
     """ """
     from ..io import get_rawfile, get_daily_flatfile
@@ -16,9 +32,11 @@ def build_dailyflat(year, month, day, ccdid, filtername, ledid=None,
     files = get_rawfile("flat", f"{year:04d}{month:02d}{day:02d}", ccdid=ccdid, ledid=ledid)
     fileout = get_daily_flatfile(year, month, day, ccdid, filtername, ledid=ledid)
     # Actual builds
-    return buildflat_from_files(files, fileout, **kwargs)
+    return buildflat_from_files(files, fileout,
+                                    delay_store=delay_store, **kwargs)
 
-def build_weeklyflat(year, week, ccdid, filtername, ledid=None, 
+def build_weeklyflat(year, week, ccdid, filtername, ledid=None,
+                    delay_store=False,
                    **kwargs):
     """ """
     from ..io import get_rawfile, get_daily_flatfileget_weekly_flatfile
@@ -26,7 +44,8 @@ def build_weeklyflat(year, week, ccdid, filtername, ledid=None,
     files = get_rawfile("flat", f"{year:04d}{week:03d}", ccdid=ccdid, ledid=ledid)
     fileout = get_weekly_flatfile(year, week, ccdid, filtername, ledid=ledid)
     # Actual builds
-    return buildflat_from_files(files, fileout, **kwargs)
+    return buildflat_from_files(files, fileout,
+                                    delay_store=delay_store, **kwargs)
 
 def buildflat_from_files(files, fileout, delay_store=False, **kwargs):
     """ """

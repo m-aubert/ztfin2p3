@@ -115,13 +115,13 @@ class FlatBuilder( object ): # /day /week /month
                     "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
                     "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
 
-        header = self.imgcollection.get_singleheader(refid)
+        header = self.imgcollection.get_singleheader(refid, as_serie=True)
         if type(header) == dask.dataframe.core.Series:
             header = header.compute()
 
         header = header.loc[keys]
             
-        newheader = fits.Header(serie.loc[keys].to_dict())
+        newheader = fits.Header(header.loc[keys].to_dict())
         newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
         
         if inclinput:

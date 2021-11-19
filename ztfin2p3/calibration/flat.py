@@ -3,7 +3,7 @@
 import os
 import pandas
 import numpy as np
-
+import dask
 
 
 def build_dailyflat(year, month, day, ccdid, filtername, ledid=None, 

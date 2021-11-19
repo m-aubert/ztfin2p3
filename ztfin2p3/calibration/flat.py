@@ -59,17 +59,19 @@ class FlatBuilder( object ): # /day /week /month
 
         from astropy.io.fits import HDUList, PrimaryHDU
         if header is None:
-            fitsheader = self.build_header()
+            if not self.has_header():
+                raise AttributeError("no header set and no header given.")
+            header = self.header
         
-        hdul = []
-        # -- Data saving
-        hdul.append( PrimaryHDU(self.data, fitsheader) )            
-        hdulist = HDUList(hdul)
+        hdul = [PrimaryHDU(self.data, header)]
+        #
+        # - Data saving
+        hdulist = HDUList( hdul )
         dirout = os.path.dirname(fileout)
         if not os.path.isdir(dirout):
             os.makedirs(dirout, exist_ok=True)
             
-        hdulist.writeto(fileout, overwrite=overwrite)
+        return hdulist.writeto(fileout, overwrite=overwrite)
         
     # ============== #
     #  Methods       # 
@@ -88,6 +90,7 @@ class FlatBuilder( object ): # /day /week /month
     def set_header(self, header):
         """ """
         self._header = header
+        
     # -------- # 
     # BUILDER  #
     # -------- #
@@ -96,9 +99,10 @@ class FlatBuilder( object ): # /day /week /month
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
-        
+        header = self.build_header()
         
         self.set_data(data)
+        self.set_header(data)
         return data
 
     def build_header(self, keys=None, refid=0, inclinput=False):
@@ -145,4 +149,19 @@ class FlatBuilder( object ): # /day /week /month
             return None
         
         return self._data
+
+    def has_data(self):
+        """ """
+        return self.data is not None
     
+    @property
+    def header(self):
+        """ """
+        if not hasattr(self, "_header"):
+            return None
+        
+        return self._header
+    
+    def has_header(self):
+        """ """
+        return self.header is not None

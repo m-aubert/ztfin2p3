@@ -65,12 +65,12 @@ class Flat( _Image_ ):
     def read_fits(cls, fitsfile, use_dask=True):
         """ """
         if use_dask:
-            data = da.from_delayed( dask.delayed(fits.getdata)(filstile),
+            data = da.from_delayed( dask.delayed(fits.getdata)(fitsfile),
                                 shape=cls.SHAPE, dtype="float")
-            header= dask.delayed(fits.getheader)(filstile)
+            header= dask.delayed(fits.getheader)(fitsfile)
         else:
-            data = fits.getdata(filstile)
-            header= fits.getheader(filstile)
+            data = fits.getdata(fitsfile)
+            header= fits.getheader(fitsfile)
 
         this = cls(data=data, header=header, use_dask=use_dask)
         this._filename = filename

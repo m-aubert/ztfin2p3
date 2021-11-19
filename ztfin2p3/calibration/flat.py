@@ -16,7 +16,7 @@ def bulk_buildflat(dates, ccdid, filtername, ledid=None):
         if len(date)==7:
             outputs.append( build_weeklyflat( date[:4],date[4:], **prop) )
         elif len(date)==8:
-            outputs.append( build_dailyflat( date[:4],date[4:6],date[6:] **prop) )
+            outputs.append( build_dailyflat( date[:4],date[4:6],date[6:], **prop) )
         else:
             warnings.warn(f"Cannot parse date={date} ; yyyywww or yyyymmdd | ignored.")
             

@@ -12,7 +12,7 @@ def bulk_buildflat(dates, ccdid, filtername, ledid=None, **kwargs):
     dates = np.atleast_1d(dates)
 
     prop = dict(ccdid=ccdid, filtername=filtername, ledid=ledid)
-    return [build_flat(date_,  delay_store=True, **{**prop,****kwargs})
+    return [build_flat(date_,  delay_store=True, **{**prop,**kwargs})
                    for date_ in dates]
 
 def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite=True, **kwargs):

@@ -11,16 +11,30 @@ from astropy.io import fits
 
 from ztfimg.base import _Image_
 
-def bulk_buildflat(dates, ccdid, filtername, ledid=None, persist_file=False, **kwargs):
+LED_FILTER = {"zg":[2,3,4,5],
+              "zr":[7,8,9,10],
+              "zi":[11,12,13,14],
+                }
+    
+def ledid_to_filtername(ledid):
+    """ """
+    for f_,v_ in LED_FILTER.items():
+        if int(ledid) in v_:
+            return f_
+    raise ValueError(f"Unknown led with ID {ledid}")
+
+
+
+def bulk_buildflat(dates, ledid=None, ccdid="*",  persist_file=False, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
     prop = dict()
     return [build_flat(str(date_),  delay_store=True, persist_file=persist_file,
-                        ccdid=ccdid, filtername=filtername, ledid=ledid, **kwargs)
+                        ccdid=ccdid, ledid=ledid, **kwargs)
                    for date_ in dates]
 
-def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite=True, persist_file=True, **kwargs):
+def build_flat(date, ccdid, ledid, delay_store=False, overwrite=True, persist_file=True, **kwargs):
     """ 
     **kwargs goes to build()
     """
@@ -30,7 +44,9 @@ def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite
     files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist" if persist_file else "delayed") # input (raw data)
     if len(files)==0:
         warnings.warn(f"No file for {date}")
-        return 
+        return
+
+    filtername = ledid_to_filtername(ledid)
     fileout = get_filepath("flat", date, ccdid=ccdid, ledid=ledid, filtername=filtername) # output
 
     # 

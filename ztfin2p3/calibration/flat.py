@@ -6,6 +6,8 @@ import numpy as np
 import dask
 
 
+def bulk_buildflats(dates, ccdid)
+
 def build_dailyflat(year, month, day, ccdid, filtername, ledid=None, 
                    **kwargs):
     """ """
@@ -26,11 +28,25 @@ def build_weeklyflat(year, week, ccdid, filtername, ledid=None,
     # Actual builds
     return buildflat_from_files(files, fileout, **kwargs)
 
-def buildflat_from_files(files, fileout, **kwargs):
+def buildflat_from_files(files, fileout, delay_store=False, **kwargs):
     """ """
-    flat = FlatBuilder.from_rawfiles(files)
-    flat.build(**kwargs)
-    flat.to_fits(fileout)
+    bflat = FlatBuilder.from_rawfiles(files)
+    data, header = bflat.build(**kwargs)
+    #
+    # - dir if possible
+    dirout = os.path.dirname(fileout)
+    if not os.path.isdir(dirout):
+        os.makedirs(dirout, exist_ok=True)
+
+    if delay_store:
+        return dask.delayed(fits.writeto)(fileout, data, header=header,
+                                              overwrite=True)
+    return fits.writeto(fileout, data, header=header, overwrite=True)
+    
+    
+
+    
+    
 
 # ==================== #
 #                      #
@@ -43,10 +59,11 @@ class FlatBuilder( object ): # /day /week /month
     def __init__(self, rawflatcollection):
         """ """
         self.set_imgcollection(rawflatcollection)
-        
+
+    
     # ============== #
     #  I/O           # 
-    # ============== #        
+    # ============== #
     @classmethod
     def from_rawfiles(cls, rawfiles, **kwargs):
         """ """
@@ -57,21 +74,18 @@ class FlatBuilder( object ): # /day /week /month
     def to_fits(self, fileout, header=None, overwrite=True):
         """ Store the data in fits format """
 
-        from astropy.io.fits import HDUList, PrimaryHDU
+        from astropy.io import fits
         if header is None:
             if not self.has_header():
                 raise AttributeError("no header set and no header given.")
             header = self.header
-        
-        hdul = [PrimaryHDU(self.data, header)]
-        #
-        # - Data saving
-        hdulist = HDUList( hdul )
+
         dirout = os.path.dirname(fileout)
         if not os.path.isdir(dirout):
             os.makedirs(dirout, exist_ok=True)
-            
-        return hdulist.writeto(fileout, overwrite=overwrite)
+
+        fits.writeto(fileout, self.data, header=header,
+                         overwrite=overwrite, **kwargs)
         
     # ============== #
     #  Methods       # 
@@ -94,16 +108,18 @@ class FlatBuilder( object ): # /day /week /month
     # -------- # 
     # BUILDER  #
     # -------- #
-    def build(self, corr_nl=True, corr_overscan=True, clipping=True, set_it=False, **kwargs):
+    def build(self, corr_nl=True, corr_overscan=True, clipping=True,
+                  set_it=False, **kwargs):
         """ """
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
         header = self.build_header()
-        
-        self.set_data(data)
-        self.set_header(header)
-        return data
+        if set_it:
+            self.set_data(data)
+            self.set_header(header)
+            
+        return data, header
 
     def build_header(self, keys=None, refid=0, inclinput=False):
         """ """

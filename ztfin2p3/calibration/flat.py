@@ -60,8 +60,6 @@ class Flat( _Image_ ):
         from ztfquery import io
         fitsfile = io.get_file(filename)
         return cls.read_fits(fitsfile)
-
-    
     
     @classmethod
     def read_fits(cls, fitsfile, use_dask=True):

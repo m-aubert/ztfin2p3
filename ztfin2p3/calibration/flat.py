@@ -65,7 +65,7 @@ class Flat( _Image_ ):
     def read_fits(cls, fitsfile, use_dask=True):
         """ """
         if use_dask:
-            data = da.delayed( dask.delayed(fits.getdata)(filstile),
+            data = da.from_delayed( dask.delayed(fits.getdata)(filstile),
                                 shape=cls.SHAPE, dtype="float")
             header= dask.delayed(fits.getheader)(filstile)
         else:

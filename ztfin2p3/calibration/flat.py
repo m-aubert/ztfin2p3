@@ -5,18 +5,18 @@ import pandas
 import numpy as np
 import dask
 import dask.array as da
-
+import warnings
 from astropy.io import fits
 
 
 from ztfimg.base import _Image_
 
-def bulk_buildflat(dates, ccdid, filtername, ledid=None, **kwargs):
+def bulk_buildflat(dates, ccdid, filtername, ledid=None, persist_file=False, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
     prop = dict()
-    return [build_flat(str(date_),  delay_store=True, persist_file=False,
+    return [build_flat(str(date_),  delay_store=True, persist_file=persist_file,
                         ccdid=ccdid, filtername=filtername, ledid=ledid, **kwargs)
                    for date_ in dates]
 
@@ -28,6 +28,9 @@ def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite
     #
     # Input
     files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist" if persist_file else "delayed") # input (raw data)
+    if len(files)==0:
+        warnings.warn(f"No file for {date}")
+        return 
     fileout = get_filepath("flat", date, ccdid=ccdid, ledid=ledid, filtername=filtername) # output
 
     # 

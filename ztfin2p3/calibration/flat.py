@@ -102,7 +102,7 @@ class FlatBuilder( object ): # /day /week /month
         header = self.build_header()
         
         self.set_data(data)
-        self.set_header(data)
+        self.set_header(header)
         return data
 
     def build_header(self, keys=None, refid=0, inclinput=False):

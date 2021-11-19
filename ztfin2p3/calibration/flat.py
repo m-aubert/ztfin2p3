@@ -25,14 +25,25 @@ def ledid_to_filtername(ledid):
 
 
 
-def bulk_buildflat(dates, ledid=None, ccdid="*",  persist_file=False, **kwargs):
+def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
-    prop = dict()
+    if ccdid is None or ccdid in ["*","all"]
+        ccdid = np.arange(1,17)
+    else:
+        ccdid = np.atleast_1d(ccdid)
+        
+    if ledid is None or ledid in ["*","all"]:
+        ledid = np.concatenate(list(flat.LED_FILTER.values()))
+    else:
+        ledid = np.atleast_1d(ledid)
+        
     return [build_flat(str(date_),  delay_store=True, persist_file=persist_file,
-                        ccdid=ccdid, ledid=ledid, **kwargs)
-                   for date_ in dates]
+                        ccdid=int(ccdid_), ledid=int(ledid_), **kwargs)
+                for ccdid_ in ccdid
+                for ledid_ in ledid
+                for date_ in dates]
 
 def build_flat(date, ccdid, ledid, delay_store=False, overwrite=True, persist_file=True, **kwargs):
     """ 

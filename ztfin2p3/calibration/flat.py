@@ -15,18 +15,19 @@ def bulk_buildflat(dates, ccdid, filtername, ledid=None, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
-    prop = dict(ccdid=ccdid, filtername=filtername, ledid=ledid)
-    return [build_flat(date_,  delay_store=True, **{**prop,**kwargs})
+    prop = dict()
+    return [build_flat(str(date_),  delay_store=True, persist_file=False,
+                        ccdid=ccdid, filtername=filtername, ledid=ledid, **kwargs)
                    for date_ in dates]
 
-def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite=True, **kwargs):
+def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite=True, persist_file=True, **kwargs):
     """ 
     **kwargs goes to build()
     """
     from ..io import get_rawfile, get_filepath
     #
     # Input
-    files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist") # input (raw data)
+    files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist" if persist_file else "delayed") # input (raw data)
     fileout = get_filepath("flat", date, ccdid=ccdid, ledid=ledid, filtername=filtername) # output
 
     # 

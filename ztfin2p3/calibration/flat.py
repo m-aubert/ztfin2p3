@@ -51,7 +51,10 @@ class Flat( _Image_ ):
         self.set_data(data)
         if header is not None:
             self.set_header(header)
-
+            
+    # ============== #
+    #  I/O           # 
+    # ============== #
     @classmethod
     def from_filename(cls, filename, use_dask=True):
         """ this first uses ztfquery.io.get_file() then call read_fits() 
@@ -75,6 +78,13 @@ class Flat( _Image_ ):
         this = cls(data=data, header=header, use_dask=use_dask)
         this._filename = fitsfile
         return this
+
+    @classmethod
+    def build_from_rawfiles(cls, rawfiles, **kwargs):
+        """ """
+        bflat = FlatBuilder.from_rawfiles(rawfiles, persist=False)
+        data, header = bflat.build(set_it=False, **kwargs)
+        return cls(data, header=None, use_dask=True)
         
 # ==================== #
 #                      #

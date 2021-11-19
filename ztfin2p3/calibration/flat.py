@@ -95,7 +95,7 @@ class FlatBuilder( object ): # /day /week /month
         self.set_data(data)
         return data
 
-    def build_header(self, keys=None, refid=0):
+    def build_header(self, keys=None, refid=0, inclinput=False):
         """ """
         from astropy.io import fits
 
@@ -109,10 +109,12 @@ class FlatBuilder( object ): # /day /week /month
         newheader = fits.Header()
         for k_ in keys:
             newheader.set(k_, header.get(k_,""), header.comments[k_])
-            
-        basenames = self.imgcollection.filenames
-        for i, basename_ in enumerate(basenames):
-            newheader.set(f"INPUT{i:02d}",basename_, "input image")
+
+        newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
+        if inclinput:
+            basenames = self.imgcollection.filenames
+            for i, basename_ in enumerate(basenames):
+                newheader.set(f"INPUT{i:02d}",basename_, "input image")
             
         return newheader
     

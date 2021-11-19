@@ -171,12 +171,15 @@ class FlatBuilder( object ): # /day /week /month
     # BUILDER  #
     # -------- #
     def build(self, corr_nl=True, corr_overscan=True, clipping=True,
-                  set_it=False, **kwargs):
+                  set_it=False, inclheader=True, **kwargs):
         """ """
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
-        header = self.build_header()
+        if inclheader:
+            header = self.build_header()
+        else:
+            header = None
         if set_it:
             self.set_data(data)
             self.set_header(header)
@@ -198,7 +201,7 @@ class FlatBuilder( object ): # /day /week /month
             header = header.compute()
 
         header = header.loc[keys]
-            
+        
         newheader = fits.Header(header.loc[keys].to_dict())
         newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
         

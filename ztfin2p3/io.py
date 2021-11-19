@@ -71,6 +71,50 @@ def get_rawfile(which, date, ccdid=None, fid=None,
                            as_dask=as_dask, client=client,
                            getwhat='file', **kwargs)
 
+
+def get_filepath(which, date, ccdid=None, **kwargs):
+    """ provides the path to the ztfin2p3 pipeline product. 
+    See get_rawfile() for raw data input.
+
+    which: [string]
+        - flat
+        - bias
+        - starflat [not implemented yet]
+        - science [not implemented yet]
+        
+    date: [string (or list of)]
+            date should be a single string
+            
+            - three format are accepted corresponding to monthly, weekly or dayly:
+                - yyyymm: get the full month (string of length 6)
+                       e.g. date='201903'
+                - yyyywww: get the corresponding week of the year (string of length 7)
+                       e.g. date='2019045'  
+                - yyyymmdd: get the given single day (string of length 8)
+                       e.g. date='20190227'
+            
+    ccdid, fid: [int or list of] -optional-
+        value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
+        to limit to.
+    """
+    if len(date)==6:
+        timeprop = dict(yyyy=int(date[:4]),mm=int(date[4:]))
+        timekind = "monthly"
+    if len(date)==7:
+        timeprop = dict(yyyy=int(date[:4]),www=int(date[4:]))
+        timekind = "weekly"        
+    elif len(date)==8:
+        timeprop = dict(yyyy=int(date[:4]),mm=int(date[4:6]), dd=int(date[6:]))
+        timekind = "daily"
+    else:
+        raise ValueError(f"Cannot parse the inpout date format {date} ; yyyymm, yyyywww or yyyymmdd expected.")
+
+    prop = {**dict(ccdid=ccdid),**kwargs}
+    return eval(f"get_{timekind}_{which}file")(**{**timeprop,**prop})
+
+    
+
+
 #########################
 #                       #
 #                       #

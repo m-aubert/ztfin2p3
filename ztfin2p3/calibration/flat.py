@@ -7,61 +7,38 @@ import dask
 
 from astropy.io import fits
 
-def bulk_buildflat(dates, ccdid, filtername, ledid=None):
+def bulk_buildflat(dates, ccdid, filtername, ledid=None, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
     prop = dict(ccdid=ccdid, filtername=filtername, ledid=ledid)
-    outputs = []
-    for date in dates:
-        if len(date)==7:
-            outputs.append( build_weeklyflat( date[:4],date[4:], **prop) )
-        elif len(date)==8:
-            outputs.append( build_dailyflat( date[:4],date[4:6],date[6:], **prop) )
-        else:
-            warnings.warn(f"Cannot parse date={date} ; yyyywww or yyyymmdd | ignored.")
-            
-    return outputs
+    return [build_flat(date_,  delay_store=True, **{**prop,****kwargs})
+                   for date_ in dates]
 
-
-def build_dailyflat(year, month, day, ccdid, filtername, ledid=None,
-                    delay_store=False,
-                   **kwargs):
-    """ """
-    from ..io import get_rawfile, get_daily_flatfile
-    year, month, day = int(year), int(month), int(day)
-    files = get_rawfile("flat", f"{year:04d}{month:02d}{day:02d}", ccdid=ccdid, ledid=ledid)
-    fileout = get_daily_flatfile(year, month, day, ccdid, filtername, ledid=ledid)
-    # Actual builds
-    return buildflat_from_files(files, fileout,
-                                    delay_store=delay_store, **kwargs)
-
-def build_weeklyflat(year, week, ccdid, filtername, ledid=None,
-                    delay_store=False,
-                   **kwargs):
-    """ """
-    from ..io import get_rawfile, get_daily_flatfileget_weekly_flatfile
-    year, week = int(year), int(week)
-    files = get_rawfile("flat", f"{year:04d}{week:03d}", ccdid=ccdid, ledid=ledid)
-    fileout = get_weekly_flatfile(year, week, ccdid, filtername, ledid=ledid)
-    # Actual builds
-    return buildflat_from_files(files, fileout,
-                                    delay_store=delay_store, **kwargs)
-
-def buildflat_from_files(files, fileout, delay_store=False, **kwargs):
-    """ """
-    bflat = FlatBuilder.from_rawfiles(files)
-    data, header = bflat.build(**kwargs)
+def build_flat(date, ccdid, filtername, ledid=None, delay_store=False, overwrite=True, **kwargs):
+    """ 
+    **kwargs goes to build()
+    """
+    from ..io import get_rawfile, get_filepath
     #
-    # - dir if possible
-    dirout = os.path.dirname(fileout)
-    if not os.path.isdir(dirout):
-        os.makedirs(dirout, exist_ok=True)
+    # Input
+    files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist") # input (raw data)
+    fileout = get_filepath("flat", date, ccdid=ccdid, ledid=ledid, filtername=filtername) # output
 
+    # 
+    # Data 
+    bflat = FlatBuilder.from_rawfiles(files)
+    data, header = bflat.build(set_it=False, **kwargs)
+    
+    # 
+    # Output 
+    os.makedirs(os.path.dirname(fileout), exist_ok=True) # Make sure the directory exists
     if delay_store:
-        return dask.delayed(fits.writeto)(fileout, data, header=header,
-                                              overwrite=True)
-    return fits.writeto(fileout, data, header=header, overwrite=True)
+        return dask.delayed(fits.writeto)(fileout, data, header=header, overwrite=overwrite)
+    return fits.writeto(fileout, data, header=header, overwrite=overwrite)
+    
+
+    
     
     
 

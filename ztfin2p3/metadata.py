@@ -101,13 +101,18 @@ class MetaDataHandler( object ):
         
     # ================= #
     #   MetaData        #
-    # ================= #
+    # ================= #    
     @classmethod
-    def get_filepath(cls, date, **kwargs):
-        """ """
+    def get_filepath(cls, date, in_meta=False, **kwargs):
+        """ get the local path where the data are """
         from ztfquery.query import metatable_to_url
         metadata = cls.get_metadata(date, **kwargs)
-        return metatable_to_url(metadata, source="local")
+        filepath = metatable_to_url(metadata, source="local")
+        if in_meta:
+            metadata["filepath"] = filepath
+            return metadata
+        
+        return filepath
     
     @classmethod
     def get_file(cls, date, getpath=False, client=None, as_dask="futures", **kwargs):

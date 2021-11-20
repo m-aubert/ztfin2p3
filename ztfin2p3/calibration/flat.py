@@ -23,6 +23,8 @@ def ledid_to_filtername(ledid):
             return f_
     raise ValueError(f"Unknown led with ID {ledid}")
 
+
+
 def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
 
     """ """
@@ -45,61 +47,25 @@ def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
                            for id_, s_ in datapath.iterrows()]
     return datapath
 
-
-def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, client=None,
-                       compute_and_forget=True, **kwargs):
+def build_from_datapath(build_dataframe, assume_exist=False, inclheader=False, overwrite=True, **kwargs):
     """ """
-    dates = np.atleast_1d(dates)
-
-    if ccdid is None or ccdid in ["*","all"]:
-        ccdid = np.arange(1,17)
-    else:
-        ccdid = np.atleast_1d(ccdid)
+    if not assume_exist:
+        from ztfquery import io
         
-    if ledid is None or ledid in ["*","all"]:
-        ledid = np.concatenate( list(LED_FILTER.values()) )
-    else:
-        ledid = np.atleast_1d(ledid)
-        
-    delayed_ = [build_flat(str(date_), ccdid=int(ccdid_), ledid=int(ledid_),
-                           delay_store=True, persist_file=persist_file, **kwargs)
-                for ccdid_ in ccdid
-                for ledid_ in ledid
-                for date_ in dates]
-    if client is None:
-        return delayed_
+    outs = []
+    for i_, s_ in build_dataframe.iterrows():
+        # 
+        fileout = s_.fileout
+        files = s_["filepath"]
+        if not assume_exist:
+            files = io.bulk_get_file(files)
+        # 
+        bflat = FlatBuilder.from_rawfiles(files, persist=False)
+        data, header = bflat.build(set_it=False, inclheader=inclheader, **kwargs)
+        output = dask.delayed(fits.writeto)(fileout, data, header=header, overwrite=overwrite)
+        outs.append(output)
+    return outs
 
-    futures_ = client.compute(delayed_)
-        
-        
-
-def build_flat(date, ccdid, ledid, delay_store=False, overwrite=True, persist_file=True, **kwargs):
-    """ 
-    **kwargs goes to build()
-    """
-    from ..io import get_rawfile, get_filepath
-    #
-    # Input
-    files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist" if persist_file else "delayed") # input (raw data)
-    if len(files)==0:
-        warnings.warn(f"No raw file for flat of {date} ledid {ledid} and ccdid {ledid}")
-        return
-
-    filtername = ledid_to_filtername(ledid)
-    fileout = get_filepath("flat", date, ccdid=ccdid, ledid=ledid, filtername=filtername) # output
-
-    # 
-    # Data 
-    bflat = FlatBuilder.from_rawfiles(files, persist=False)
-    data, header = bflat.build(set_it=False, **kwargs)
-    
-    # 
-    # Output 
-    os.makedirs(os.path.dirname(fileout), exist_ok=True) # Make sure the directory exists
-    if delay_store:
-        return dask.delayed(fits.writeto)(fileout, data, header=header, overwrite=overwrite)
-    return fits.writeto(fileout, data, header=header, overwrite=overwrite)
-    
     
 
 class Flat( _Image_ ):

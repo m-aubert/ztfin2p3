@@ -103,14 +103,19 @@ class MetaDataHandler( object ):
     #   MetaData        #
     # ================= #
     @classmethod
-    def get_file(cls, date, client=None, as_dask="futures", **kwargs):
+    def get_filepath(cls, date, **kwargs):
+        """ """
+        from ztfquery.query import metatable_to_url
+        metadata = cls.get_metadata(date, **kwargs)
+        return metatable_to_url(metadata, source="local")
+    
+    @classmethod
+    def get_file(cls, date, getpath=False, client=None, as_dask="futures", **kwargs):
         """ get the file associated to the input metadata limits. 
 
         **kwargs goes to get_metadata, it contains selection options like ccdid or fid.
         """
-        from ztfquery import io
-        zquery = cls.get_zquery(date,**kwargs)
-        files = zquery.get_data_path()
+        files = cls.get_filepath(date, **kwargs)
         return io.bulk_get_file(files, client=client, as_dask=as_dask)
         
     @classmethod

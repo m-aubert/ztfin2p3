@@ -13,7 +13,7 @@ from ztfimg.base import _Image_
 
 LED_FILTER = {"zg":[2,3,4,5],
               "zr":[7,8,9,10],
-              "zi":[11,12,13,14],
+              "zi":[11,12,13],
                 }
     
 def ledid_to_filtername(ledid):
@@ -25,7 +25,8 @@ def ledid_to_filtername(ledid):
 
 
 
-def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, **kwargs):
+def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, client=None,
+                       compute_and_forget=True, **kwargs):
     """ """
     dates = np.atleast_1d(dates)
 
@@ -39,11 +40,17 @@ def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, **kwargs):
     else:
         ledid = np.atleast_1d(ledid)
         
-    return [build_flat(str(date_), ccdid=int(ccdid_), ledid=int(ledid_),
+    delayed_ = [build_flat(str(date_), ccdid=int(ccdid_), ledid=int(ledid_),
                            delay_store=True, persist_file=persist_file, **kwargs)
                 for ccdid_ in ccdid
                 for ledid_ in ledid
                 for date_ in dates]
+    if client is None:
+        return delayed_
+
+    futures_ = client.compute(delayed_)
+        
+        
 
 def build_flat(date, ccdid, ledid, delay_store=False, overwrite=True, persist_file=True, **kwargs):
     """ 
@@ -54,7 +61,7 @@ def build_flat(date, ccdid, ledid, delay_store=False, overwrite=True, persist_fi
     # Input
     files = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, as_dask="persist" if persist_file else "delayed") # input (raw data)
     if len(files)==0:
-        warnings.warn(f"No file for {date}")
+        warnings.warn(f"No raw file for flat of {date} ledid {ledid} and ccdid {ledid}")
         return
 
     filtername = ledid_to_filtername(ledid)

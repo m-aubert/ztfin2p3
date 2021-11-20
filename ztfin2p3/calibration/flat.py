@@ -23,6 +23,26 @@ def ledid_to_filtername(ledid):
             return f_
     raise ValueError(f"Unknown led with ID {ledid}")
 
+def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
+
+    """ """
+    # IRSA metadata
+    from ..metadata import get_rawmeta
+    meta = get_rawmeta("flat", date, ccdid=ccdid, ledid=ledid,  getwhat="filepath", in_meta=True)
+    # Parsing out what to do:
+    if groupby == "day":
+        meta[groupby] = meta.filefracday.astype("str").str[:8]
+    elif groupby == "month":
+        meta[groupby] = meta.filefracday.astype("str").str[:6]
+    else:
+        raise ValueError(f"Only groupby day or month implemented: {groupby} given")
+    
+    datapath = meta.groupby([groupby,"ccdid","ledid"])["filepath"].apply(list).reset_index()
+    datapath["filtername"] = datapath["ledid"].apply(flat.ledid_to_filtername)
+    datapath["fileout"] = [io.get_filepath("flat", str(s_[groupby]), 
+                            ccdid=int(s_.ccdid), ledid=int(s_.ledid), filtername=s_.filtername)
+                           for id_, s_ in datapath.iterrows()]
+    return datapath
 
 
 def bulk_buildflat(dates, ledid="*", ccdid="*",  persist_file=False, client=None,

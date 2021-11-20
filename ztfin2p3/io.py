@@ -100,7 +100,7 @@ def get_filepath(which, date, ccdid=None, **kwargs):
     if len(date)==6:
         timeprop = dict(yyyy=int(date[:4]),mm=int(date[4:]))
         timekind = "monthly"
-    if len(date)==7:
+    elif len(date)==7:
         timeprop = dict(yyyy=int(date[:4]),www=int(date[4:]))
         timekind = "weekly"        
     elif len(date)==8:

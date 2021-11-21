@@ -56,6 +56,7 @@ def build_from_datapath(build_dataframe, assume_exist=False, inclheader=False, o
     for i_, s_ in build_dataframe.iterrows():
         # 
         fileout = s_.fileout
+        os.makedirs(os.path.dirname(fileout), exist_ok=True) # build if needed
         files = s_["filepath"]
         if not assume_exist:
             files = io.bulk_get_file(files)

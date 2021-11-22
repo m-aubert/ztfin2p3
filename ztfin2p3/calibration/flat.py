@@ -9,7 +9,7 @@ import warnings
 from astropy.io import fits
 
 
-from ztfimg.base import _Image_
+from ztfimg.base import _Image_, _FocalPlane_
 
 LED_FILTER = {"zg":[2,3,4,5],
               "zr":[7,8,9,10],
@@ -147,7 +147,22 @@ class Flat( _Image_ ):
             raise ValueError(f"qid must be 0,1,2 or 3 {qid} given")
         
         return data_
-        
+
+
+class FlatFocalPlane( _FocalPlane_ ):
+    
+    @classmethod
+    def from_filenames(cls, ccd_filenames, use_dask=True, **kwargs):
+        """ """
+        this = cls(use_dask=use_dask)
+        for file_ in ccd_filenames:
+            ccd_ = RawCCD.from_filename(file_, use_dask=use_dask, **kwargs)
+            this.set_ccd(ccd_, ccdid=ccd_.ccdid)
+
+        this._filenames = ccd_filenames
+        return this
+
+    
 # ==================== #
 #                      #
 #   Flat Builder       #

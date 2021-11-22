@@ -166,8 +166,9 @@ class FlatFocalPlane( _FocalPlane_ ):
     @classmethod
     def from_date(cls, date, ledid, use_dask=True, **kwargs):
         """ """
+        from ..io import get_filepath
         ccdids = np.arange(1,17)
-        filenames = [io.get_filepath("flat", date, ccdid=ccdid_, ledid=ledid)
+        filenames = [get_filepath("flat", date, ccdid=ccdid_, ledid=ledid)
                      for ccdid_ in ccdids]
         return cls.from_filenames(filenames, use_dask=use_dask, **kwargs)
     

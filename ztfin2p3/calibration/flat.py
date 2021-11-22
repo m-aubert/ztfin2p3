@@ -96,10 +96,10 @@ class Flat( _Image_ ):
         from ztfquery import io
         basename = os.path.basename(filename)
         if not basename.startswith("ztfin2p3"):
-            fitsfile = io.get_file(filename)
+            filename = io.get_file(filename)
 
         if ".fits" in basename:
-            return cls.read_fits(fitsfile)
+            return cls.read_fits(filename)
         else:
             raise NotImplementedError(f"Only fits file loader implemented (read_fits) ; {filename} given")
     

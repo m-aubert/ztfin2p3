@@ -156,7 +156,7 @@ class FlatFocalPlane( _FocalPlane_ ):
         """ """
         this = cls(use_dask=use_dask)
         for file_ in flatfilenames:
-            ccd_ = flat.Flat.from_filename(file_, use_dask=use_dask, **kwargs)
+            ccd_ = Flat.from_filename(file_, use_dask=use_dask, **kwargs)
             ccdid = int(file_.split("_")[-3].replace("c",""))
             this.set_ccd(ccd_, ccdid=ccdid)
 

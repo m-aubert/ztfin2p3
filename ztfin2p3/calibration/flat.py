@@ -102,6 +102,14 @@ class Flat( _Image_ ):
             return cls.read_fits(filename)
         else:
             raise NotImplementedError(f"Only fits file loader implemented (read_fits) ; {filename} given")
+
+    @classmethod
+    def from_date(cls, date, ledid, ccdid, use_dask=True, **kwargs):
+        """ """
+        from ..io import get_filepath
+        filename = get_filepath("flat", date, ccdid=ccdid, ledid=ledid)
+        return cls.from_filenames(filename, use_dask=use_dask, **kwargs)
+        
     
     @classmethod
     def read_fits(cls, fitsfile, use_dask=True):

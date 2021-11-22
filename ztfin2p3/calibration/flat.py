@@ -108,7 +108,7 @@ class Flat( _Image_ ):
         """ """
         from ..io import get_filepath
         filename = get_filepath("flat", date, ccdid=ccdid, ledid=ledid)
-        return cls.from_filenames(filename, use_dask=use_dask, **kwargs)
+        return cls.from_filename(filename, use_dask=use_dask, **kwargs)
         
     
     @classmethod

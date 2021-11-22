@@ -71,7 +71,6 @@ def get_rawfile(which, date, ccdid=None, fid=None,
                            as_dask=as_dask, client=client,
                            getwhat='file', **kwargs)
 
-
 def get_filepath(which, date, ccdid=None, **kwargs):
     """ provides the path to the ztfin2p3 pipeline product. 
     See get_rawfile() for raw data input.
@@ -191,7 +190,6 @@ def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
     if filtername is None:
         from .calibration.flat import ledid_to_filtername
         filtername = ledid_to_filtername(ledid)
-    print("filtername", filtername)
     
     filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}{dd:02d}_000000_{filtername}_c{ccdid:02d}_l{ledid:02d}_flat.fits" 
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
@@ -244,8 +242,8 @@ def get_monthly_flatfile(yyyy, mm, ccdid, filtername=None, ledid=None):
         
     if filtername is None:
         from .calibration.flat import ledid_to_filtername
-        filtername = ledid_to_filtername(ledid)        
-    
+        filtername = ledid_to_filtername(ledid)
+        
     filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}_000000_{filtername}_c{ccdid:02d}_l{ledid:02d}_flat.fits" 
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}", 
                         filestructure)

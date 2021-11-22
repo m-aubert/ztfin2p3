@@ -83,13 +83,25 @@ class Flat( _Image_ ):
     #  I/O           # 
     # ============== #
     @classmethod
-    def from_filename(cls, filename, use_dask=True):
-        """ this first uses ztfquery.io.get_file() then call read_fits() 
-        directly use read_fits() if you have the input data already is a full path.
+    def from_filename(cls, filename, use_dask=True, assume_exist=True):
+        """ loads the object given the input file. 
+
+        Parameters
+        ----------
+
+        assume_exist: [bool]
+            Shall this run ztfquery.io.get_file() ?
+            
         """
         from ztfquery import io
-        fitsfile = io.get_file(filename)
-        return cls.read_fits(fitsfile)
+        basename = os.path.basename(filename)
+        if not basename.startswith("ztfin2p3"):
+            fitsfile = io.get_file(filename)
+
+        if ".fits" in basename:
+            return cls.read_fits(fitsfile)
+        else:
+            raise NotImplementedError(f"Only fits file loader implemented (read_fits) ; {filename} given")
     
     @classmethod
     def read_fits(cls, fitsfile, use_dask=True):

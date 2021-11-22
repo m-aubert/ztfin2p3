@@ -196,7 +196,7 @@ def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
 
-def get_weekly_flatfile(yyyy, www, ccdid, filtername, ledid=None):
+def get_weekly_flatfile(yyyy, www, ccdid, filtername=None, ledid=None):
     """ 
     www: [int]
         Week number. 
@@ -224,7 +224,7 @@ def get_weekly_flatfile(yyyy, www, ccdid, filtername, ledid=None):
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{www:03d}", 
                         filestructure)
 
-def get_monthly_flatfile(yyyy, mm, ccdid, filtername, ledid=None):
+def get_monthly_flatfile(yyyy, mm, ccdid, filtername=None, ledid=None):
     """ 
     mm: [int]
         Month number. (1->12)

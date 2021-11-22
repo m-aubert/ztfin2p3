@@ -152,16 +152,32 @@ class Flat( _Image_ ):
 class FlatFocalPlane( _FocalPlane_ ):
     
     @classmethod
-    def from_filenames(cls, ccd_filenames, use_dask=True, **kwargs):
+    def from_filenames(cls, flatfilenames, use_dask=True, **kwargs):
         """ """
         this = cls(use_dask=use_dask)
-        for file_ in ccd_filenames:
-            ccd_ = RawCCD.from_filename(file_, use_dask=use_dask, **kwargs)
-            this.set_ccd(ccd_, ccdid=ccd_.ccdid)
+        for file_ in flatfilenames:
+            ccd_ = flat.Flat.from_filename(file_, use_dask=use_dask, **kwargs)
+            ccdid = int(file_.split("_")[-3].replace("c",""))
+            this.set_ccd(ccd_, ccdid=ccdid)
 
-        this._filenames = ccd_filenames
+        this._filenames = flatfilenames
         return this
-
+    
+    @classmethod
+    def from_date(cls, date, ledid, use_dask=True, **kwargs):
+        """ """
+        ccdids = np.arange(1,17)
+        filenames = [io.get_filepath("flat", date, ccdid=ccdid_, ledid=ledid)
+                     for ccdid_ in ccdids]
+        return cls.from_filenames(filenames, use_dask=use_dask, **kwargs)
+    
+    # ============= # 
+    #   Methods     #
+    # ============= #
+    def get_quadrant(self, *args, **kwargs):
+        """ """
+        raise NotImplemented("get_quadrant() is not usable as flat are CCD-base. See get_quadrant_data().")
+    
     
 # ==================== #
 #                      #

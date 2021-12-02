@@ -120,6 +120,7 @@ class MetaDataHandler( object ):
 
         **kwargs goes to get_metadata, it contains selection options like ccdid or fid.
         """
+        from ztfquery import io
         files = cls.get_filepath(date, **kwargs)
         return io.bulk_get_file(files, client=client, as_dask=as_dask)
         

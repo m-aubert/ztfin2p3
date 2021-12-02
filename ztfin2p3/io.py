@@ -267,7 +267,8 @@ def get_monthly_starflatfile(yyyy, mm, ccdid, filtername):
 #                       #
 #                       #
 #########################
-def get_sciencefile(yyyy, mm, dd, fracday, field, filtername, ccdid, qid):
+def get_sciencefile(yyyy, mm, dd, fracday, field, filtername, ccdid,
+                        qid, suffix="sciimg.fits"):
     """ 
     Following the same format as main this's IPAC. Only changing
     ztf->ztfin2p3
@@ -275,7 +276,7 @@ def get_sciencefile(yyyy, mm, dd, fracday, field, filtername, ccdid, qid):
     e.g. ztfin2p3/sci/2018/0221/328009/ztfin2p3_20180221328009_700426_zg_c01_o_q1_sciimg.fits'
 
     """
-    filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}{dd:02d}{fracday:06d}_{field:06d}_{filtername}_c{ccdid:02d}_o_q{qid:1d}_sciimg.fits"
+    filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}{dd:02d}{fracday:06d}_{field:06d}_{filtername}_c{ccdid:02d}_o_q{qid:1d}_{suffix}"
     return os.path.join(BASESOURCE, "sci", f"{yyyy:04d}",f"{mm:02d}{dd:02d}", f"{fracday:06d}",
                         filestructure)
     

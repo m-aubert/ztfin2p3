@@ -143,16 +143,16 @@ class Flat( _Image_ ):
         # this accounts for all rotation and rebin did before
         qshape = np.asarray(dataccd.shape)/2. 
 
-        if qid == 0:
+        if qid == 1:
             data_ = dataccd[qshape[0]:, qshape[1]:]
-        elif qid == 1:
-            data_ = dataccd[qshape[0]:, :qshape[1]]
         elif qid == 2:
-            data_ = dataccd[:qshape[0], :qshape[1]]
+            data_ = dataccd[qshape[0]:, :qshape[1]]
         elif qid == 3:
+            data_ = dataccd[:qshape[0], :qshape[1]]
+        elif qid == 4:
             data_ = dataccd[:qshape[0], qshape[1]:]
         else:
-            raise ValueError(f"qid must be 0,1,2 or 3 {qid} given")
+            raise ValueError(f"qid must be 1->4 {qid} given")
         
         return data_
 
@@ -183,9 +183,9 @@ class FlatFocalPlane( _FocalPlane_ ):
     # ============= # 
     #   Methods     #
     # ============= #
-    def get_quadrant_data(self, qid, **kwargs):
+    def get_quadrant_data(self, rcid, **kwargs):
         """ """
-        ccdid, qid = self.rcid_to_ccdid_qid(qid)
+        ccdid, qid = self.rcid_to_ccdid_qid(rcid)
         return self.get_ccd(ccdid).get_quadrant_data(qid, **kwargs)
     
     def get_quadrant(self, *args, **kwargs):

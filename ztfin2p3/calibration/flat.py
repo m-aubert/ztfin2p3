@@ -183,6 +183,11 @@ class FlatFocalPlane( _FocalPlane_ ):
     # ============= # 
     #   Methods     #
     # ============= #
+    def get_quadrant_data(self, qid, **kwargs):
+        """ """
+        ccdid, qid = self.rcid_to_ccdid_qid(qid)
+        return self.get_ccd(ccdid).get_quadrant_data(qid, **kwargs)
+    
     def get_quadrant(self, *args, **kwargs):
         """ """
         raise NotImplemented("get_quadrant() is not usable as flat are CCD-base. See get_quadrant_data().")

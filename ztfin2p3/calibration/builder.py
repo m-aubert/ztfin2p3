@@ -23,7 +23,7 @@ class CalibrationBuilder( object ): # /day /week /month
         import os        
         from astropy.io import fits
         if header is None:
-            if not self.has_header():x
+            if not self.has_header():
                 raise AttributeError("no header set and no header given.")
             header = self.header
 

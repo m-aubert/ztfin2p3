@@ -1,7 +1,6 @@
 
 """ library to build the ztfin2p3 pipeline screen flats """
 import os
-import pandas
 import numpy as np
 import dask
 import dask.array as da
@@ -99,7 +98,7 @@ class Flat( _Image_ ):
             filename = io.get_file(filename)
 
         if ".fits" in basename:
-            return cls.read_fits(filename)
+            return cls.read_fits(filename, use_dask=use_dask)
         else:
             raise NotImplementedError(f"Only fits file loader implemented (read_fits) ; {filename} given")
 
@@ -137,7 +136,21 @@ class Flat( _Image_ ):
     #  Method        # 
     # ============== #
     def get_quadrant_data(self, qid, **kwargs):
-        """ **kwargs goes to get_data() this then split the data """
+        """ **kwargs goes to get_data() this then split the data.
+        
+        Parameters
+        ----------
+        qid: [int or None/'*']
+            which quadrant you want ?
+            - int: 1,2,3 or 4
+            - None or '*'/'all': all quadrant return as list [1,2,3,4]
+
+        **kwargs goes to get_data()
+
+        Returns
+        -------
+        ndarray (numpy or dask)
+        """
         qid = int(qid)
         dataccd = self.get_data(**kwargs)
         # this accounts for all rotation and rebin did before
@@ -151,6 +164,13 @@ class Flat( _Image_ ):
             data_ = dataccd[:qshape[0], :qshape[1]]
         elif qid == 4:
             data_ = dataccd[:qshape[0], qshape[1]:]
+        elif qid is None or qid in ["*","all"]:
+            data_ = [dataccd[qshape[0]:, qshape[1]:],
+                     dataccd[qshape[0]:, :qshape[1]],
+                     dataccd[:qshape[0], :qshape[1]],
+                     dataccd[:qshape[0], qshape[1]:]
+                    ]
+            
         else:
             raise ValueError(f"qid must be 1->4 {qid} given")
         

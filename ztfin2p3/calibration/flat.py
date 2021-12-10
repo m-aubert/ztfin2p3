@@ -151,7 +151,11 @@ class Flat( _Image_ ):
         -------
         ndarray (numpy or dask)
         """
-        qid = int(qid)
+        if qid in ["*","all"]:
+            qid = None
+        if qid is not None:
+            qid = int(qid)
+            
         dataccd = self.get_data(**kwargs)
         # this accounts for all rotation and rebin did before
         qshape = np.asarray(dataccd.shape)/2. 

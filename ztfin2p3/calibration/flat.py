@@ -158,7 +158,7 @@ class Flat( _Image_ ):
             
         dataccd = self.get_data(**kwargs)
         # this accounts for all rotation and rebin did before
-        qshape = np.asarray(dataccd.shape)/2. 
+        qshape = np.asarray(np.asarray(dataccd.shape)/2, dtype="int")
 
         if qid == 1:
             data_ = dataccd[qshape[0]:, qshape[1]:]

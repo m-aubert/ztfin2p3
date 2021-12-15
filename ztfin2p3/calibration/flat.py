@@ -8,7 +8,7 @@ import warnings
 from astropy.io import fits
 
 
-from ztfimg.base import _Image_, _FocalPlane_
+from ztfimg.base import _Image_, FocalPlane
 
 LED_FILTER = {"zg":[2,3,4,5],
               "zr":[7,8,9,10],
@@ -181,7 +181,7 @@ class Flat( _Image_ ):
         return data_
 
 
-class FlatFocalPlane( _FocalPlane_ ):
+class FlatFocalPlane( FocalPlane ):
     
     @classmethod
     def from_filenames(cls, flatfilenames, use_dask=True, **kwargs):

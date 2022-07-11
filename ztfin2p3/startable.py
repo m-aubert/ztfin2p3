@@ -19,8 +19,7 @@ from scipy.sparse import linalg as splinalg
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import healpy as hp    
-from astropy.stats import sigma_clipped_stats
+import healpy as hp
 from scipy import stats
 
 import copy

@@ -144,7 +144,8 @@ class Startable( object ):
 
     def add_starflat_column(self,which_photometry='AP',extra_string='',dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
         """
-        This function is using Estelle's fits files. For now we haven't designed a storage for the 'uberflats' etc.
+        This function is using Estelle's fits files. 
+        For now we haven't designed a storage for the 'uberflats' etc.
         """
         
         print('for now no interpolation, just read in rounded xy pos, can take a couple of minutes to loop over all quadrants')
@@ -161,7 +162,8 @@ class Startable( object ):
             self._data.loc[quadrant_mask,f'corr_{which_photometry}{extra_string}']=starflat_arr[self._data.x[quadrant_mask].values.round(0).astype(int),self._data.y[quadrant_mask].values.round(0).astype(int)]
      
     
-    def add_starflat(self,which_photometry='AP',ccdid=None,qid=None,dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
+    def add_starflat(self,which_photometry='AP',ccdid=None,qid=None,
+                         dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
         """ 
         not sure if this function was used in the last run. Keeping it for now. 
         """
@@ -187,7 +189,8 @@ class Startable( object ):
                 starflat_arr=self.get_starflat_corr(qid_,ccdid_,self.ztf_filter,which_photometry,dir_path_fits_ztf)
                 self.starflats[ccdid_-1,qid_-1,:,:] = starflat_arr
     
-    def add_starflat_mean(self,which_photometry='AP',dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
+    def add_starflat_mean(self,which_photometry='AP',
+                              dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
         """
         Never used, but should return the quadrant mean of the starflats. 
         """
@@ -231,7 +234,8 @@ class Startable( object ):
         self._n_uv_pix = np.uint32(n_pix_y/bin_width_y * n_pix_x/bin_width_x)
 
     @staticmethod
-    def get_starflat_corr(qid,ccdid,filtercode,which_photometry='AP', dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
+    def get_starflat_corr(qid,ccdid,filtercode,which_photometry='AP',
+                        dir_path_fits_ztf="/sps/ztf/data/ztfin2p3/cal/starflat/2019_newscript/03/"):
         """
         Will need to define a time_validity for the starflat. For now hard coded the march SF
         

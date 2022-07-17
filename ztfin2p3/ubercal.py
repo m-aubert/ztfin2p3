@@ -20,13 +20,17 @@ from scipy.sparse import linalg as splinalg
 
 
 
-def _build_index_df_(dataframe, inid, outid, minsize=None):
-    """ """
-    tmp_df = dataframe.groupby(inid, as_index=False).size()
-    if minsize:
-        tmp_df = tmp_df[tmp_df["size"]>=minsize].reset_index(drop=True)
+def map_id(dataframe, in_id, out_id, inplace=False):
+    """ add a new column"""
+    if not inplace:
+        dataframe = dataframe.copy()
         
-    return dataframe.merge(tmp_df[inid].reset_index().rename({"index":outid}, axis=1), on=inid)
+    unique_ = np.sort(np.unique( dataframe[in_id].values ))
+    new = np.arange( len(unique_) )
+    dict_mapping = dict( zip(unique_, new) )
+    
+    dataframe[out_id] = dataframe[in_id].map( dict_mapping )
+    return dataframe
 
 
 # =================== #
@@ -37,7 +41,7 @@ def _build_index_df_(dataframe, inid, outid, minsize=None):
 
 class Ubercal( object ):
     STARID = "u_starid"
-    EXPID = "u_expid"
+    ZPID = "u_zpid"
     MAGID = "mag"
     EMAGID = "e_mag"
     
@@ -114,7 +118,8 @@ class Ubercal( object ):
         -------
         instance of Object
         """
-        data = cls.shape_dataframe(data, starid=starid, expid=expid, min_exp=min_exp)
+        data = cls.shape_dataframe(data, starid=starid, expid=expid, min_exp=min_exp
+                                  ).reset_index()
         return cls(data)
     
     @classmethod
@@ -141,9 +146,16 @@ class Ubercal( object ):
         Returns
         -------
         DataFrame
-        """            
-        dataframe = _build_index_df_(dataframe, inid=starid, outid=cls.STARID, minsize=min_exp)
-        dataframe = _build_index_df_(dataframe, inid=expid, outid=cls.EXPID)
+        """
+        if min_exp is not None:
+            tmp = dataframe.groupby(starid).size()
+            kept = tmp[tmp>min_exp].index
+            dataframe = dataframe[dataframe["starid"].isin(kept)]
+        else:
+            dataframe = dataframe.copy()
+        
+        dataframe = map_id(dataframe, in_id=starid, out_id=cls.STARID)
+        dataframe = map_id(dataframe, in_id=expid, out_id=cls.ZPID)
         return dataframe
 
     # =============== #
@@ -189,7 +201,7 @@ class Ubercal( object ):
             acoo = self.acoo
         else:
             coo  = pandas.concat([self.data[self.STARID],
-                                  self.data[self.EXPID]+self.nstars])
+                                  self.data[self.ZPID]+self.nstars])
             acoo = sparse.coo_matrix((np.asarray(np.ones( len(coo) ), dtype="int"), 
                                      (np.asarray(coo.index, dtype="int"), 
                                       np.asarray(coo.values, dtype="int")))
@@ -208,10 +220,44 @@ class Ubercal( object ):
             wmat = sparse.diags(1/np.asarray(self.data[self.EMAGID], dtype="float")**2)
             
         return wmat
-    
+
     # ------- #
     # SOLVER  #
-    # ------- #    
+    # ------- #
+    def solve_and_format(self, ref_expid, **kwargs):
+        """ calls solve and then format_solved. 
+
+        = self.solve doc = 
+
+        Solve for X in A•X = B.
+        This method include variance, so it actually solves for
+             A^t @ C @ A • X = A^T @ C • B
+             
+        
+        Parameters
+        ----------
+        ref_expid: [int]
+            id of the exposure used as reference.
+            Star magnitude will be in unit of this.
+            Other zp will be offset with respect to it.
+            
+        method: [string] -optional-
+            Method used to solve the linear system.
+            - cholmod: uses cholmod (cholesky() then factor())
+            - lsqr: uses scipy.sparse.linalg.lsqr()
+            - spsolve: uses scipy.sparse.linalg.spsolve() # but super slow !            
+            [No other method implemented]
+            
+        Returns
+        -------
+        whavether the model returns:
+        - x for spsolve and cholmod
+        - x (and more) for lsqr
+
+        """
+        x = self.solve(ref_expid, **kwargs)
+        return self.format_solved(x)
+        
     def solve(self, ref_expid, method="cholmod"):
         """ Solve for X in A•X = B.
         This method include variance, so it actually solves for
@@ -264,7 +310,36 @@ class Ubercal( object ):
             return factor( atw_ref.dot(b) )
             
         raise NotImplementedError(f"Only 'lsqr', 'spsolve' and 'cholmod' method implemented ; {method} given")
-    
+
+    def format_solved(self, solved_solution):
+        """ adds the columns 'fitted_zp' and 'fitted_mag' to a copy of self.data 
+
+        = See solve_and_format() = 
+        
+        Parameters
+        ----------
+        solved_solution: [array]
+            1d array returned by self.solve()
+
+        Returns
+        -------
+        DataFrame
+        """
+        fitted_mag = self.data[self.STARID
+                              ].map( dict( zip( self.data[self.STARID].sort_values().unique(),
+                                                solved_solution[:self.nstars]
+                                              )))
+
+        fitted_expid = self.data[self.ZPID
+                              ].map( dict( zip( self.data[self.ZPID].sort_values().unique(),
+                                                np.insert(solved_solution[self.nstars:],
+                                                          self.ref_expid, 0)
+                                              )))
+        data = self.data.copy()
+        data["fitted_zp"] = fitted_expid
+        data["fitted_mag"] = fitted_mag
+        return data
+        
     # =============== #
     #   Properties    #
     # =============== #
@@ -291,7 +366,7 @@ class Ubercal( object ):
         """ number of exposures in the dataset """
         if not self.has_data():
             return None
-        return len(self.data[self.EXPID].unique())
+        return len(self.data[self.ZPID].unique())
     
     @property
     def nobservations(self):
@@ -331,52 +406,3 @@ class Ubercal( object ):
         return self._wmatrix
 
 
-# =================== #
-#                     #
-#   SIMULATOR         #
-#                     #
-# =================== #
-
-class UbercalSimulator( object ):
-    """ """
-    def __init__(self, dataframe):
-        """ """
-        self.set_data(dataframe)
-        
-    @classmethod
-    def from_simsample(cls, size, maglim=22, calib_percent=1):
-        """ """
-        mags = maglim - np.random.exponential(3, size)
-        e_mag = np.random.normal(0.05,0.05/10,size=size)
-        
-        data = pandas.DataFrame({"true_mag":mags, "true_e_mag":e_mag})
-        data["mag"] = np.random.normal(mags, e_mag)
-        data["e_mag"] = np.random.normal(e_mag, e_mag/10)
-        return cls(data)
-        
-    # =============== #
-    #  Methods        #
-    # =============== #    
-    def set_data(self, data):
-        """ input a dataframe col [mag, e_mag]. """
-        self._data = data
-
-    def draw_ubercal(self, nobs, nstar_range=[40,500], offset_range=[-0.1,0.1]):
-        """ """
-        ntargets = np.random.randint(*nstar_range, size=nobs)
-        offsets = np.random.uniform(*offset_range, size=nobs)
-        datas = {}
-        for i, (ntarget_, offset_) in enumerate(zip(ntargets,offsets)):
-            data_obs = self.data.sample(ntarget_, replace=False) 
-            data_obs["delta_mag"] = offset_
-            data_obs["mag"] += offset_
-            datas[i] = data_obs
-            
-        return pandas.concat(datas).reset_index().rename({"level_0":"expid","level_1":"starid"}, axis=1)
-    # =============== #
-    #   Properties    #
-    # =============== #    
-    @property
-    def data(self):
-        """ """
-        return self._data

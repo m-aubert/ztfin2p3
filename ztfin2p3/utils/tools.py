@@ -1,3 +1,27 @@
+import numpy as np
+
+# ================ #
+#                  #
+#    NUMPY         #
+#                  #
+# ================ # 
+
+def get_in_squares(squares, xy):
+    """ """
+    if np.shape(squares) == (4,):
+        # Accepts both 
+        return get_in_squares(squares[None,:], xy)[0]
+    
+    return (  (xy[:, 0, None] >= squares[:, 0]) 
+            & (xy[:, 0, None] <= squares[:, 1]) 
+            & (xy[:, 1, None] >= squares[:, 2]) 
+            & (xy[:, 1, None] <= squares[:, 3])).T
+
+# ================ #
+#                  #
+#    PARSER        #
+#                  #
+# ================ # 
 
 def parse_singledate(date):
     """ parse the input 'date' into a datetime start and end

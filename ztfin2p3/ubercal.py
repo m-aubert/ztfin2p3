@@ -5,10 +5,29 @@ startable.py shall replace it.
 
 Example:
 --------
-usim = UbercalSimulator.from_simsample( int(1e5) )
-ucal = usim.draw_ubercal(1000)
-ubercal = Ubercal.from_dataframe(ucal, min_exp=3)
-x_solution = ubercal.solve(ref_expid=0, method="cholmod")
+# Generate a simulation
+
+## Generate 3e5 stars and 400 Exposures
+from ztfin2p3.simulations import linearmodel
+usim = linearmodel.StarTableSimulator.from_simsample(1e5)
+usim.draw_pointings(100, in_place=True)
+
+## Add normal scatter to each expid and normalscatter for noise
+from ztfin2p3.simulations import effects as ef
+
+new_mag, effects = usim.apply_effects(on="mag", 
+                       **{"expzp": ef.UniqueKeyNormalScatter("expid"),
+                          "noise": ef.NormalScatter(scale=0.1),
+                          }
+                      )
+## and update mag accordingly
+usim.simdata["mag"] = new_mag
+
+# build ubercal with the simulated data
+from ztfin2p3 import ubercal
+uber =ubercal.Ubercal.from_dataframe(usim.simdata)
+## and solve it.
+data = uber.solve_and_format(0)
 """
 
 

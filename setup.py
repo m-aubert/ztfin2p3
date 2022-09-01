@@ -11,7 +11,7 @@ MAINTAINER_EMAIL = 'm.rigault@ipnl.in2p3.fr'
 URL = 'https://github.com/MickaelRigault/ztfin2p3'
 LICENSE = 'Apache 2.0'
 DOWNLOAD_URL = 'https://github.com/MickaelRigault/ztfin2p3'
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 
 try:
     from setuptools import setup, find_packages
@@ -54,7 +54,7 @@ if __name__ == "__main__":
           download_url=DOWNLOAD_URL,
           install_requires=install_requires,
           packages=packages,
-          #package_data={"ztfimg":["data/*"]},#, 'data/*'
+          package_data={"ztfin2p3":["config/*"]},#, 'data/*'
           classifiers=[
               'Intended Audience :: Science/Research',
               'Programming Language :: Python :: 3.6',

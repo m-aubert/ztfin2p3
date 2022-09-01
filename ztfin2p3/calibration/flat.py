@@ -223,19 +223,12 @@ class FlatFocalPlane( FocalPlane ):
 #                      #
 # ==================== #
 from .builder import CalibrationBuilder
-class FlatBuilder( CalibrationBuilder ): 
+
+class FlatBuilder( CalibrationBuilder ):
+    
     # -------- # 
     # BUILDER  #
     # -------- #
-    def build(self, corr_nl=True, corr_overscan=True, clipping=True,
-                  set_it=False, inclheader=True, **kwargs):
-        """ """
-        return super().build(corr_nl=corr_nl,
-                                 corr_overscan=corr_overscan,
-                                 clipping=clipping,
-                                 set_it=set_it, inclheader=inclheader,
-                                 **kwargs)
-
     def build_header(self, keys=None, refid=0, inclinput=False):
         """ """
         from astropy.io import fits

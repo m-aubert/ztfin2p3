@@ -4,7 +4,27 @@ import os
 from ztfquery.io import LOCALSOURCE
 BASESOURCE = os.path.join(LOCALSOURCE, "ztfin2p3")
 
+PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
 
+def get_config(which):
+    """ 
+    which: string
+        - calibration
+
+    return
+    ------
+    dict
+    """
+    import tomli
+    if which in ["cal","calib","calibration"]:
+        configfile = os.path.join(PACKAGE_PATH, "config", "calibration.tolm")
+    else:
+        raise NotImplementedError(f"getting config for {which} is not implemented")
+    
+    with open(configfile, 'rb') as file_:
+        config = tomli.load(file_)
+    return config
+    
 def get_rawfile(which, date, ccdid=None, fid=None,
                 client=None, as_dask="computed", whatfile='file',
                 

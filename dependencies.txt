@@ -1,0 +1,2 @@
+ztfimg>=0.10.5 # core image package
+tomli # config parser, will be called tomllib in python 3.11

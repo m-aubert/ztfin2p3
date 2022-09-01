@@ -60,13 +60,14 @@ class CalibrationBuilder( object ): # /day /week /month
         """ """
         # This could be updated in the calibration function #
         
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=True),
+        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=clipping),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
         if inclheader:
             header = self.build_header()
         else:
             header = None
+            
         if set_it:
             self.set_data(data)
             self.set_header(header)

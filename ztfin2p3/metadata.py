@@ -102,6 +102,11 @@ def get_raw(which, date, what, ccdid=None, fid=None,
 
     return getattr(class_, method)(date, **{**prop, **kwargs})
 
+def metadata_to_url(metadata, source="local"):
+    """ """
+    from ztfquery.query import metatable_to_url
+    return metatable_to_url(metadata, source="local")
+
 
 class MetaDataHandler( object ):
     _KIND = None # IRSA kind: raw, sci, cal
@@ -119,29 +124,23 @@ class MetaDataHandler( object ):
     #   MetaData        #
     # ================= #    
     @classmethod
-    def get_filepath(cls, date, in_meta=False, **kwargs):
+    def get_filepath(cls, date, **kwargs)
         """ get the local path where the data are """
-        from ztfquery.query import metatable_to_url
-        metadata = cls.get_metadata(date, **kwargs)
-        filepath = metatable_to_url(metadata, source="local")
-        if in_meta:
-            metadata["filepath"] = filepath
-            return metadata
-        
-        return filepath
+        warnings.warn("get_filepath is deprecated use get_metadata( add_filepath=True)")
+        return cls.get_metadata(date, add_filepath=True, **kwargs)
     
     @classmethod
-    def get_file(cls, date, getpath=False, client=None, as_dask="futures", **kwargs):
+    def get_file(cls, date, client=None, as_dask="futures", **kwargs):
         """ get the file associated to the input metadata limits. 
 
         **kwargs goes to get_metadata, it contains selection options like ccdid or fid.
         """
         from ztfquery import io
-        files = cls.get_filepath(date, **kwargs)
+        files = cls.get_metadata(date, add_filepath=True, **kwargs)
         return io.bulk_get_file(files, client=client, as_dask=as_dask)
         
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None):
+    def get_metadata(cls, date, ccdid=None, fid=None, add_filepath=False):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -208,6 +207,10 @@ class MetaDataHandler( object ):
         data["day"] = data["filefracday"].astype("str").str[:8]
         data["month"] = data["filefracday"].astype("str").str[:6]
         data["year"] = data["filefracday"].astype("str").str[:4]
+
+        if add_filepath:
+            data["filepath"] = metadata_to_url(data)
+            
         return data
     
     @classmethod

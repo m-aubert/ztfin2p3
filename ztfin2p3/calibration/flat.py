@@ -32,12 +32,6 @@ def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
     from ..io import get_filepath
     meta = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, in_meta=True)
     # Parsing out what to do:
-    if groupby == "day":
-        meta[groupby] = meta.filefracday.astype("str").str[:8]
-    elif groupby == "month":
-        meta[groupby] = meta.filefracday.astype("str").str[:6]
-    else:
-        raise ValueError(f"Only groupby day or month implemented: {groupby} given")
     
     datapath = meta.groupby([groupby,"ccdid","ledid"])["filepath"].apply(list).reset_index()
     datapath["filtername"] = datapath["ledid"].apply(ledid_to_filtername)

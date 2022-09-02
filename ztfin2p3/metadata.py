@@ -353,7 +353,7 @@ class RawFlatMetaData( RawMetaData ):
     #   Super It        #
     # ================= #    
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None):
+    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None, add_filepath=True):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -383,7 +383,7 @@ class RawFlatMetaData( RawMetaData ):
         -------
         dataframe (IRSA metadata)
         """
-        data = super().get_metadata(date, ccdid=ccdid, fid=fid)
+        data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
             
@@ -434,7 +434,7 @@ class RawScienceMetaData( RawMetaData ):
     _SUBKIND = "object"
     
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, field=None):
+    def get_metadata(cls, date, ccdid=None, fid=None, field=None, add_filepath=True):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -467,7 +467,7 @@ class RawScienceMetaData( RawMetaData ):
         -------
         dataframe (IRSA metadata)
         """
-        data = super().get_metadata(date, ccdid=ccdid, fid=fid)
+        data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
         if field is not None:
             data = data[data["field"].isin(np.atleast_1d(field))]
             

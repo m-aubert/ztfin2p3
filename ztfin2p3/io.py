@@ -162,11 +162,21 @@ def get_directory(kind, subkind):
 # =========== #
 #  BIAS       #
 # =========== #
-def get_daily_biasfile(yyyy, mm, dd, ccdid):
+def get_daily_biasfile(day, ccdid):
     """ 
+    day: 
+        accepted formats:
+        - yyyy-mm-dd
+        - yyyymmdd
+
+
     format: cal/bias/yyyy/mmdd/ztfin2p3_yyyymmdd_000000_bi_ccdid_bias.fits
     
     """
+    day = str(day).replace("-","") # to accept both yyyy-mm-dd and yyyymmdd
+    yyyy,mm,dd = int(day[:4]),int(day[4:6]),int(day[6:])
+
+    
     filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}{dd:02d}_000000_bi_c{ccdid:02d}_bias.fits" 
     return os.path.join(BIAS_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
@@ -192,7 +202,7 @@ def get_daily_flatfile(day, ccdid, filtername=None, ledid=None):
     format: cal/flat/yyyy/mmdd/ztfin2p3_yyyymmdd_000000_filtername_ccdid_ledid_flat.fits
     """
     day = str(day).replace("-","") # to accept both yyyy-mm-dd and yyyymmdd
-    yyyy,mm,dd = day[:4],day[4:6],day[6:]
+    yyyy,mm,dd = int(day[:4]),int(day[4:6]),int(day[6:])
     
     if ledid is None:
         ledid = 0

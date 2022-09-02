@@ -207,7 +207,7 @@ def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
     
     format: cal/flat/yyyy/mmdd/ztfin2p3_yyyymmddyyyymmdd_000000_filtername_ccdid_ledid_flat.fits
     """
-    nole d= (ledid is None)
+    noled= (ledid is None)
     if noled and filtername is None:
         raise ValueError("ledid and filtername cannot be both None")
       

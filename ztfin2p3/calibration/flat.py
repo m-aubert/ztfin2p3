@@ -28,9 +28,9 @@ def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
 
     """ """
     # IRSA metadata
-    from ..metadata import get_rawmeta
+    from ..metadata import get_rawfile
     from ..io import get_filepath
-    meta = get_rawmeta("flat", date, ccdid=ccdid, ledid=ledid,  getwhat="filepath", in_meta=True)
+    meta = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, in_meta=True)
     # Parsing out what to do:
     if groupby == "day":
         meta[groupby] = meta.filefracday.astype("str").str[:8]

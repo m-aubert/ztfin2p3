@@ -23,6 +23,7 @@ def get_config(which):
     
     with open(configfile, 'rb') as file_:
         config = tomli.load(file_)
+        
     return config
     
 def get_rawfile(which, date, ccdid=None, fid=None,
@@ -55,7 +56,6 @@ def get_rawfile(which, date, ccdid=None, fid=None,
         value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
         to limit to.
 
-
     client: [Dask client] -optional-
         provide the client that hold the dask cluster.
 
@@ -87,10 +87,9 @@ def get_rawfile(which, date, ccdid=None, fid=None,
     files = get_rawfile('flat', '2020023', ledid=2, ccdid=4)
 
     """
-    from .metadata import get_rawmeta
-    return get_rawmeta(which=which, date=date, ccdid=ccdid, fid=fid,
-                           as_dask=as_dask, client=client,
-                           getwhat='file', **kwargs)
+    from .metadata import get_rawfile
+    return get_rawfile(which=which, date=date, ccdid=ccdid, fid=fid,
+                           as_dask=as_dask, client=client, **kwargs)
 
 def get_filepath(which, date, ccdid=None, **kwargs):
     """ provides the path to the ztfin2p3 pipeline product. 

@@ -6,8 +6,28 @@ import pandas
 import warnings
 from .utils.tools import parse_singledate
 
+
+__all__ = ["get_raw"]
+
+def get_rawfile(which, date, ccdid=None, fid=None,
+                **kwargs):
+    """ shortcut to get_raw(what='file',) """
+    return get_raw(which, date, ccdid=ccdid, fid=fid,
+                   what='file', **kwargs)
+
 def get_rawmeta(which, date, ccdid=None, fid=None,
-                getwhat='metadata',
+                **kwargs):
+    """ shortcut to get_raw(what='metadata',) """
+    return get_raw(which, date, ccdid=ccdid, fid=fid,
+                   what='metadata', **kwargs)
+
+def get_rawzquery(which, date, ccdid=None, fid=None,
+                **kwargs):
+    """ shortcut to get_raw(what='zquery') """
+    return get_raw(which, date, ccdid=ccdid, fid=fid,
+                   what='zquery', **kwargs)
+
+def get_raw(which, date, what, ccdid=None, fid=None,
                 **kwargs):
     """ 
     which: [string]
@@ -30,18 +50,17 @@ def get_rawmeta(which, date, ccdid=None, fid=None,
                        e.g. date='2019045'  
                 - yyyymmdd: get the given single day (string of length 8)
                        e.g. date='20190227'
-            
+    what: [string] -optional-
+        what do you want to get. get_{what} must be an existing
+        method. You have for instance:
+        - file
+        - metadata/meta
+        - zquery
+
+
     ccdid, fid: [int or list of] -optional-
         value or list of ccd (ccdid=[1->16]) or filter (fid=[1->3]) you want
         to limit to.
-
-
-    getwhat: [string] -optional-
-        what do you want to get. get_{getwhat} must be an existing
-        method. You have for instance:
-        - file
-        - metadata
-        - zquery
 
         
     **kwargs goes to get_metadata()
@@ -51,7 +70,7 @@ def get_rawmeta(which, date, ccdid=None, fid=None,
        - which='science':
            - field
 
-       - getwhat = 'file':
+       - what = 'file':
            - client, 
            - as_dask
 
@@ -70,7 +89,7 @@ def get_rawmeta(which, date, ccdid=None, fid=None,
 
     """
     prop = dict(ccdid=ccdid, fid=fid)
-    method = f"get_{getwhat}"
+    method = f"get_{what}"
 
     if which == "flat":
         class_ = RawFlatMetaData
@@ -81,10 +100,7 @@ def get_rawmeta(which, date, ccdid=None, fid=None,
     else:
         raise NotImplementedError(f"which = {which} has not been")
 
-    return getattr(class_,method)(date, **{**prop, **kwargs})
-
-
-
+    return getattr(class_, method)(date, **{**prop, **kwargs})
 
 
 class MetaDataHandler( object ):

@@ -124,7 +124,7 @@ class MetaDataHandler( object ):
     #   MetaData        #
     # ================= #    
     @classmethod
-    def get_filepath(cls, date, **kwargs)
+    def get_filepath(cls, date, **kwargs):
         """ get the local path where the data are """
         warnings.warn("get_filepath is deprecated use get_metadata( add_filepath=True)")
         return cls.get_metadata(date, add_filepath=True, **kwargs)

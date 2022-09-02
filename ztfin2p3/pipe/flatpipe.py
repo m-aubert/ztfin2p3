@@ -60,11 +60,16 @@ class FlatPipe( BasePipe ):
         files_out = []
         for i_, s_ in datafile.iterrows():
             # loop over entires (per led, per day per CCD)
-            filesint = s_["filepath"] # raw files in
-            filepathout = io.get_daily_flatfile(s_["day"],ccdid=s_["ccdid"], ledid=s_["ledid"]) # where to store
-            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=False, persist=False) # loads the builder
+            # - raw files in
+            filesint = s_["filepath"] 
+            # - where to store
+            filepathout = io.get_daily_flatfile(s_["day"],ccdid=s_["ccdid"], ledid=s_["ledid"]) 
+            # - loads the builder for these files in
+            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=False, persist=False)
+            # - build the merged image and store it, returning the storing path
             fileout_ = fbuilder.build_and_store(filepathout, incl_header=True, 
-                                                header_keys=header_keys, **kwargs) # build and store | but delayed
+                                                header_keys=header_keys, **kwargs)
+            # - append the storing path
             files_out.append(fileout_)
         
         datafile["path_dailyflat"] = files_out

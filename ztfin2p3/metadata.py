@@ -181,6 +181,7 @@ class MetaDataHandler( object ):
 
         if type(date) is str and len(date) == 6: # means per month as stored.
             return cls.get_monthly_metadata(date[:4],date[4:])
+        
         elif type(date) is str:
             start, end = parse_singledate(date) # -> start, end
         else:
@@ -203,6 +204,10 @@ class MetaDataHandler( object ):
         if fid is not None:
             data = data[data["fid"].isin(np.atleast_1d(fid))]
 
+        # - Add day, always useful
+        data["day"] = data["filefracday"].astype("str").str[:8]
+        data["month"] = data["filefracday"].astype("str").str[:6]
+        data["year"] = data["filefracday"].astype("str").str[:4]
         return data
     
     @classmethod

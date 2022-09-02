@@ -93,33 +93,30 @@ class CalibrationBuilder( object ): # /day /week /month
             
         return data, header
     
-    def build_header(self, keys=None, refid=0, inclinput=False):
+    def build_header(self, keys=None, refid=0, inclinput=False, use_dask=None):
         """ """
+        import copy
         from astropy.io import fits
-
-        if keys is None:
-            keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
-                    "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
-                    "FRAMENUM",
-                    #"ILUM_LED", "ILUMWAVE",
-                    "PROGRMID","FILTERID",
-                    "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-
-        header = self.imgcollection.get_singleheader(refid, as_serie=True)
-        if type(header) == dask.dataframe.core.Series:
+        header = self.imgcollection.get_singleheader(refid, as_serie=False, 
+                                                    use_dask=use_dask)
+        if "dask" in str(type(header)):
+            print("used dasked so compute")
             header = header.compute()
-
-        header = header.loc[keys]
-        
-        newheader = fits.Header(header.loc[keys].to_dict())
+            
+        if keys is not None:
+            newheader = header.__class__([ copy.copy(header.cards[k]) for k in np.atleast_1d(keys)])
+        else:
+            newheader = copy.copy(header)
+            
         newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
         
         if inclinput:
             basenames = self.imgcollection.filenames
             for i, basename_ in enumerate(basenames):
                 newheader.set(f"INPUT{i:02d}",basename_, "input image")
-            
+              
         return newheader
+    
     
     # ============== #
     #  Properties    # 

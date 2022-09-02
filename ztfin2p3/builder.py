@@ -22,7 +22,7 @@ class CalibrationBuilder( object ): # /day /week /month
         """
         from ztfimg import raw
         flatcollection = raw.RawCCDCollection.from_filenames(rawfiles, persist=persist,
-                                                             as_path=as_path
+                                                             as_path=as_path,
                                                              **kwargs)
         return cls(flatcollection)
 

@@ -1,6 +1,6 @@
 """ Top level calibration builder class """
 
-
+import numpy as np
 class CalibrationBuilder( object ): # /day /week /month
 
     def __init__(self, rawcollection):

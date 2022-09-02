@@ -213,8 +213,9 @@ def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
     elif filtername is None:
         from .calibration.flat import ledid_to_filtername
         filtername = ledid_to_filtername(ledid)
-    elif ledid is None:
-        noled=True
+    else:
+        noled= (ledid is None)
+        
 
     start = str(start).replace("-","") # so it accepts this format yyyy-mm-ddand yyyymmdd
     end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd

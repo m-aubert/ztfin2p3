@@ -16,7 +16,7 @@ class BasePipe( object ):
 
     def set_datafile(self, datafile):
         """ """
-        return self._datafile
+        self._datafile = datafile
     
     # ============== #
     #   Parameters   #

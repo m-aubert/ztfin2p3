@@ -28,9 +28,10 @@ def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
 
     """ """
     # IRSA metadata
-    from ..metadata import get_rawfile
     from ..io import get_filepath
-    meta = get_rawfile("flat", date, ccdid=ccdid, ledid=ledid, in_meta=True)
+    
+    meta = metadata.RawFlatMetaData.get_metadata(['2019-03-01', '2019-03-03'], add_filepath=True)
+    datapath = meta.groupby(["day","ccdid","ledid"])["filepath"].apply(list).reset_index()
     # Parsing out what to do:
     
     datapath = meta.groupby([groupby,"ccdid","ledid"])["filepath"].apply(list).reset_index()
@@ -58,6 +59,7 @@ def build_from_datapath(build_dataframe, assume_exist=False, inclheader=False, o
         data, header = bflat.build(set_it=False, inclheader=inclheader, **kwargs)
         output = dask.delayed(fits.writeto)(fileout, data, header=header, overwrite=overwrite)
         outs.append(output)
+        
     return outs
 
     

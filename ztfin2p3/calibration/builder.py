@@ -74,7 +74,8 @@ class CalibrationBuilder( object ): # /day /week /month
         return to_fits(fileout, data, header=header, overwrite=overwrite)
     
     def build(self, corr_nl=True, corr_overscan=True,
-                  set_it=False, inclheader=True, **kwargs):
+                  set_it=False, inclheader=True,
+                  dask_on_header=False, **kwargs):
         """ **kwargs goes to imgcollection.get_data_mean """
         # This could be updated in the calibration function #
         
@@ -82,7 +83,7 @@ class CalibrationBuilder( object ): # /day /week /month
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
         if inclheader:
-            header = self.build_header()
+            header = self.build_header(use_dask=dask_on_header)
         else:
             header = None
             

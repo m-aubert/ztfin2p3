@@ -7,7 +7,6 @@ class CalibrationBuilder( object ): # /day /week /month
         """ """
         self.set_imgcollection( rawcollection )
 
-    
     # ============== #
     #  I/O           # 
     # ============== #
@@ -18,21 +17,25 @@ class CalibrationBuilder( object ): # /day /week /month
         flatcollection = raw.RawCCDCollection.from_filenames(rawfiles, **kwargs)
         return cls(flatcollection)
 
-    def to_fits(self, fileout, header=None, overwrite=True):
+    def to_fits(self, fileout, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format """
+        return self._to_fits(fileout, self.data, header=self.header,
+                                 overwrite=overwrite,
+                                 **kwargs)
+
+    @staticmethod
+    def _to_fits(fileout, data, header=None,  overwrite=True,
+                     **kwargs):
+        """ """
         import os        
         from astropy.io import fits
-        if header is None:
-            if not self.has_header():
-                raise AttributeError("no header set and no header given.")
-            header = self.header
-
         dirout = os.path.dirname(fileout)
         if not os.path.isdir(dirout):
             os.makedirs(dirout, exist_ok=True)
 
-        fits.writeto(fileout, self.data, header=header,
+        fits.writeto(fileout, data, header=header,
                          overwrite=overwrite, **kwargs)
+        return fileout
         
     # ============== #
     #  Methods       # 
@@ -55,12 +58,27 @@ class CalibrationBuilder( object ): # /day /week /month
     # -------- # 
     # BUILDER  #
     # -------- #
-    def build(self, corr_nl=True, corr_overscan=True, clipping=True,
-                  set_it=False, inclheader=True, **kwargs):
+    def build_and_store(self, fileout, overwrite=True, 
+                        corr_nl=True, corr_overscan=True,
+                        set_it=False, inclheader=True, **kwargs):
         """ """
+        data, header = self.build(corr_nl=corr_nl, corr_overscan=corr_overscan,
+                                 set_it=False, inclheader=True, **kwargs)
+        
+        if "dask" in str(type(data)): # is a dask object
+            import dask
+            to_fits = dask.delayed(self._to_fits)
+        else:
+            to_fits = self._to_fits
+            
+        return to_fits(fileout, data, header=header, overwrite=overwrite)
+    
+    def build(self, corr_nl=True, corr_overscan=True,
+                  set_it=False, inclheader=True, **kwargs):
+        """ **kwargs goes to imgcollection.get_data_mean """
         # This could be updated in the calibration function #
         
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, clipping=clipping),
+        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl),
                 **kwargs}
         data = self.imgcollection.get_data_mean(**prop)
         if inclheader:
@@ -73,7 +91,7 @@ class CalibrationBuilder( object ): # /day /week /month
             self.set_header(header)
             
         return data, header
-
+    
     def build_header(self, keys=None, refid=0, inclinput=False):
         """ """
         from astropy.io import fits

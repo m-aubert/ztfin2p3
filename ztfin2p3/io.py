@@ -178,9 +178,12 @@ def get_flat_for_exposure(yyyymmdd, filtername):
     """ """
     raise NotImplementedError("to be implemented with config.")
     
-def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
+def get_daily_flatfile(day, ccdid, filtername=None, ledid=None):
     """ 
-    
+    day: 
+        accepted formats:
+        - yyyy-mm-dd
+        - yyyymmdd
     ledid: [int]
         number of the LED.
         if 0, this will be the best combination (see header)
@@ -188,6 +191,9 @@ def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
 
     format: cal/flat/yyyy/mmdd/ztfin2p3_yyyymmdd_000000_filtername_ccdid_ledid_flat.fits
     """
+    day = str(day).replace("-","") # to accept both yyyy-mm-dd and yyyymmdd
+    yyyy,mm,dd = day[:4],day[4:6],day[6:]
+    
     if ledid is None:
         ledid = 0
         if filtername is None:

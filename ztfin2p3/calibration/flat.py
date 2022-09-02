@@ -24,23 +24,6 @@ def ledid_to_filtername(ledid):
 
 
 
-def get_build_datapath(date, ccdid=None, ledid=None, groupby="day"):
-
-    """ """
-    # IRSA metadata
-    from ..io import get_filepath
-    
-    meta = metadata.RawFlatMetaData.get_metadata(['2019-03-01', '2019-03-03'], add_filepath=True)
-    datapath = meta.groupby(["day","ccdid","ledid"])["filepath"].apply(list).reset_index()
-    # Parsing out what to do:
-    
-    datapath = meta.groupby([groupby,"ccdid","ledid"])["filepath"].apply(list).reset_index()
-    datapath["filtername"] = datapath["ledid"].apply(ledid_to_filtername)
-    datapath["fileout"] = [get_filepath("flat", str(s_[groupby]), 
-                            ccdid=int(s_.ccdid), ledid=int(s_.ledid), filtername=s_.filtername)
-                           for id_, s_ in datapath.iterrows()]
-    return datapath
-
 def build_from_datapath(build_dataframe, assume_exist=False, inclheader=False, overwrite=True, **kwargs):
     """ """
     if not assume_exist:
@@ -218,36 +201,3 @@ class FlatFocalPlane( FocalPlane ):
 #   Flat Builder       #
 #                      #
 # ==================== #
-from .builder import CalibrationBuilder
-
-class FlatBuilder( CalibrationBuilder ):
-    
-    # -------- # 
-    # BUILDER  #
-    # -------- #
-    def build_header(self, keys=None, refid=0, inclinput=False):
-        """ """
-        from astropy.io import fits
-
-        if keys is None:
-            keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
-                    "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
-                    "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
-                    "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-
-        header = self.imgcollection.get_singleheader(refid, as_serie=True)
-        if type(header) == dask.dataframe.core.Series:
-            header = header.compute()
-
-        header = header.loc[keys]
-        
-        newheader = fits.Header(header.loc[keys].to_dict())
-        newheader.set(f"NINPUTS",self.imgcollection.nimages, "num. input images")
-        
-        if inclinput:
-            basenames = self.imgcollection.filenames
-            for i, basename_ in enumerate(basenames):
-                newheader.set(f"INPUT{i:02d}",basename_, "input image")
-            
-        return newheader
-    

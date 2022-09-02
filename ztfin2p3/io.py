@@ -174,6 +174,10 @@ def get_daily_biasfile(yyyy, mm, dd, ccdid):
 # =========== #
 #  FLAT       #
 # =========== #
+def get_flat_for_exposure(yyyymmdd, filtername):
+    """ """
+    raise NotImplementedError("to be implemented with config.")
+    
 def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
     """ 
     
@@ -215,8 +219,6 @@ def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
         from .calibration.flat import ledid_to_filtername
         filtername = ledid_to_filtername(ledid)
         
-        
-
     start = str(start).replace("-","") # so it accepts this format yyyy-mm-ddand yyyymmdd
     end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
 
@@ -224,7 +226,7 @@ def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
     if noled:
         filestructure +="_flat.fits" 
     else:
-        filestructure +="_l{ledid:02d}_flat.fits" 
+        filestructure +=f"_l{ledid:02d}_flat.fits" 
     return filestructure
 
     

@@ -171,24 +171,6 @@ def get_daily_biasfile(yyyy, mm, dd, ccdid):
     return os.path.join(BIAS_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
 
-def get_weekly_biasfile(yyyy, www, ccdid):
-    """ 
-    format: cal/bias/yyyy/www/ztfin2p3_yyyywww_000000_bi_ccdid_bias.fits
-    
-    """
-    filestructure = f"ztfin2p3_{yyyy:04d}{www:03d}_000000_bi_c{ccdid:02d}_bias.fits" 
-    return os.path.join(BIAS_DIR, f"{yyyy:04d}",f"{www:03d}", 
-                        filestructure)
-
-def get_monthly_biasfile(yyyy, mm, ccdid):
-    """ 
-    format: cal/bias/yyyy/mm/ztfin2p3_yyyymm_000000_bi_ccdid_bias.fits
-    
-    """
-    filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}_000000_bi_c{ccdid:02d}_bias.fits" 
-    return os.path.join(BIAS_DIR, f"{yyyy:04d}",f"{mm:02d}", 
-                        filestructure)
-
 # =========== #
 #  FLAT       #
 # =========== #
@@ -205,7 +187,7 @@ def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
     if ledid is None:
         ledid = 0
         if filtername is None:
-            raise ValueError("ledid and filtername  cannot but both None")
+            raise ValueError("ledid and filtername cannot be both None")
         
     if filtername is None:
         from .calibration.flat import ledid_to_filtername
@@ -215,59 +197,36 @@ def get_daily_flatfile(yyyy, mm, dd, ccdid, filtername=None, ledid=None):
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
 
-def get_weekly_flatfile(yyyy, www, ccdid, filtername=None, ledid=None):
-    """ 
-    www: [int]
-        Week number. 
-        While there are only 52 weeks in 1 year, this is going to pad it to 3
-        to avoid confusion with months.
-        
-    ledid: [int]
-        number of the LED.
-        if 0 or None, this will be the best combination (see header)
-
-
-    format: cal/flat/yyyy/www/ztfin2p3_yyyywww_000000_filtername_ccdid_ledid_flat.fits
+def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
     """
-    if ledid is None:
-        ledid = 0
-        if filtername is None:
-            raise ValueError("ledid and filtername  cannot but both None")
-        
-    if filtername is None:
-        from .calibration.flat import ledid_to_filtername
-        filtername = ledid_to_filtername(ledid)
-        
+    start, end:
+        period boundaries
+        accepted formats
+         - yyyy-mm-dd
+         - yyyymmdd
     
-    filestructure = f"ztfin2p3_{yyyy:04d}{www:03d}_000000_{filtername}_c{ccdid:02d}_l{ledid:02d}_flat.fits" 
-    return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{www:03d}", 
-                        filestructure)
-
-def get_monthly_flatfile(yyyy, mm, ccdid, filtername=None, ledid=None):
-    """ 
-    mm: [int]
-        Month number. (1->12)
-        
-    ledid: [int]
-        number of the LED.
-        if 0 or None, this will be the best combination (see header)
-
-
-    format: cal/flat/yyyy/www/ztfin2p3_yyyywww_000000_filtername_ccdid_ledid_flat.fits
+    format: cal/flat/yyyy/mmdd/ztfin2p3_yyyymmddyyyymmdd_000000_filtername_ccdid_ledid_flat.fits
     """
-    if ledid is None:
-        ledid = 0
-        if filtername is None:
-            raise ValueError("ledid and filtername  cannot but both None")
-        
-    if filtername is None:
+    if ledid is None and filtername is None:
+        raise ValueError("ledid and filtername cannot be both None")
+      
+    elif filtername is None:
         from .calibration.flat import ledid_to_filtername
         filtername = ledid_to_filtername(ledid)
-        
-    filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}_000000_{filtername}_c{ccdid:02d}_l{ledid:02d}_flat.fits" 
-    return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}", 
-                        filestructure)
+    elif ledid is None
+        noled=True
 
+    start = str(start).replace("-","") # so it accepts this format yyyy-mm-ddand yyyymmdd
+    end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
+
+    filestructure = f"ztfin2p3_{start}{end}_000000_{filtername}_c{ccdid:02d}"
+    if noled:
+        filestructure +="_flat.fits" 
+    else:
+        filestructure +="_l{ledid:02d}_flat.fits" 
+    return filestructure
+
+    
 # =========== #
 #  StarFlat   #
 # =========== #

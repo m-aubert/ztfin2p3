@@ -2,7 +2,8 @@
 
 
 class BasePipe( object ):
-
+    _KIND = "_base_"
+    
     def __init__(self, use_dask=True):
         """ """
         self._use_dask = use_dask
@@ -36,3 +37,7 @@ class BasePipe( object ):
         """ shall this pipeline use dask (you have delayed object) """
         return self._use_dask
     
+    @property
+    def pipekind(self):
+        """ what kind of pipeline is this object ? """
+        return self._KIND

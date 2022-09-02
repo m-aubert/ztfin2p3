@@ -11,10 +11,19 @@ class CalibrationBuilder( object ): # /day /week /month
     #  I/O           # 
     # ============== #
     @classmethod
-    def from_rawfiles(cls, rawfiles, persist=True, **kwargs):
-        """ """
+    def from_rawfiles(cls, rawfiles, persist=False, as_path=False, **kwargs):
+        """ 
+        as_path: [bool] -optional-
+            if as_path is False, then rawfile=io.get_file(rawfile) is used.
+            the enables to automatically download the missing file but work
+            only for IPAC-pipeline based file. It add a (small) overhead.
+            If you know the file exists, use as_path=True.
+        
+        """
         from ztfimg import raw
-        flatcollection = raw.RawCCDCollection.from_filenames(rawfiles, persist=persist, **kwargs)
+        flatcollection = raw.RawCCDCollection.from_filenames(rawfiles, persist=persist,
+                                                             as_path=as_path
+                                                             **kwargs)
         return cls(flatcollection)
 
     def to_fits(self, fileout, header=None, overwrite=True, **kwargs):

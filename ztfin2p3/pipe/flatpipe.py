@@ -1,5 +1,6 @@
 
 from .basepipe import BasePipe
+from ..builder import CalibrationBuilder
 from .. import io
 # BasePipe has
 #     - config and co.
@@ -40,33 +41,66 @@ class FlatPipe( BasePipe ):
         self.set_datafile(datafile) 
         
     
-    def run_perday(self, **kwargs):
+    def get_init_datafile(self):
         """ """
-        datafile = self.datafile.groupby(["day","ccdid","ledid"])["filepath"].apply(list).reset_index()
+        return self.datafile.groupby(["day","ccdid","ledid"])["filepath"].apply(list).reset_index()
+    
+    def run_perday(self, datafile=None, **kwargs):
+        """ """
+        header_keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
+                       "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
+                       "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
+                       "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
+
+        
+        
+        if datafile is None:
+            datafile = self.get_init_datafile()
         
         files_out = []
         for i_, s_ in datafile.iterrows():
-            filesint = s_["filepath"]
-            filepathout = io.get_daily_flatfile(s_["day"],ccdid=s_["ccdid"], ledid=s_["ledid"])
-            fbuilder = FlatBuilder.from_rawfiles(filesint)
-            fileout_ = fbuilder.build_and_store(filepathout, **kwargs)
+            # loop over entires (per led, per day per CCD)
+            filesint = s_["filepath"] # raw files in
+            filepathout = io.get_daily_flatfile(s_["day"],ccdid=s_["ccdid"], ledid=s_["ledid"]) # where to store
+            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=False, persist=False) # loads the builder
+            fileout_ = fbuilder.build_and_store(filepathout, incl_header=True, 
+                                                header_keys=header_keys, **kwargs) # build and store | but delayed
             files_out.append(fileout_)
         
-        return files_out
+        datafile["path_dailyflat"] = files_out
+        return datafile
+    
+    def merge_dailyflats(self, daily_datafile, **kwargs):
+        """ """
+        datafile = daily_datafile.groupby(["ccdid","ledid"])["path_dailyflat"].apply(list).reset_index()
+        
+        files_out = []
+        for i_, s_ in datafile.iterrows():
+            # loop over entires (per led, per day per CCD)
+            filesint = s_["path_dailyflat"] # raw files in
+            filepathout = io.get_period_flatfile(*self.period, ccdid=s_["ccdid"], ledid=s_["ledid"]) # where to store
+            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=True, persist=False) # loads the builder
+            fileout_ = fbuilder.build_and_store(filepathout, incl_header=False,  # header not ready
+                                                **kwargs) # build and store | but delayed
+            files_out.append(fileout_)
+        
+        datafile["path_periodledflat"] = files_out
+        return datafile
 
-
+        
         
     def run(self, use_dask=True):
         """ """
         #
         # For N days in the period
         #
+        datafile = self.get_init_datafile()
         # --------
         # Step 1.
         # build from per day, per led and per ccd
         #    = N x 11 x 16 flats
-        #    --> N x 11 x 64 (stored per quadrant)
-        daily_outputs = self.run_perday()
+        #    --> N x 11 x 16
+        daily_outputs = self.run_perday(datafile)
 
         # --------        
         # Step 2.        
@@ -74,8 +108,18 @@ class FlatPipe( BasePipe ):
         #    = 11 x 16 flats x 2 (i.e. per norm)
         #  - normed per CCD 
         #  - normed per focal plane
+        #    --> 11 x 16 x 2 stored (per quadrant)
+        periodled_outputs = self.merge_dailyflats(daily_outputs)
+        return periodled_outputs
+        
+        # --------        
+        # Step 3.        
+        # merge flat per period, per led and per ccd
+        #    = 11 x 16 flats x 2 (i.e. per norm)
+        #  - normed per CCD 
+        #  - normed per focal plane
         #    --> 11 x 64 x 2 stored (per quadrant)
-        ledccd_outputs = daily_outputs.groupby(["ccdid","ledid"])["path_dailyflat"].apply(list)
+        
         
         # --------
         # Step 3.        
@@ -95,27 +139,3 @@ class FlatPipe( BasePipe ):
             return None
         
         return self._period
-
-    
-
-
-from ..builder import CalibrationBuilder
-class FlatBuilder( CalibrationBuilder ):
-    
-    # -------- # 
-    # BUILDER  #
-    # -------- #
-    def build_header(self, keys=None, refid=0, inclinput=False, use_dask=None):
-        """ """
-        from astropy.io import fits
-
-        if keys is None:
-            keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
-                    "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
-                    "FRAMENUM","ILUM_LED", "ILUMWAVE", "PROGRMID","FILTERID",
-                    "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-
-        return super().build_header(keys=keys, refid=refid, inclinput=inclinput, use_dask=use_dask)
-    
-
-    

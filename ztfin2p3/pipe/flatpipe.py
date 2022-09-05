@@ -7,6 +7,8 @@ from .. import io
 #     - datafile and co.
 #     - use_dask
 
+__all__ = ["FlatPipe"]
+
 class FlatPipe( BasePipe ):
     _KIND = "flat"
     
@@ -45,7 +47,7 @@ class FlatPipe( BasePipe ):
         """ """
         return self.datafile.groupby(["day","ccdid","ledid"])["filepath"].apply(list).reset_index()
     
-    def run_perday(self, datafile=None, **kwargs):
+    def run_perday(self, datafile=None, raw=True, **kwargs):
         """ """
         header_keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
                        "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
@@ -65,7 +67,9 @@ class FlatPipe( BasePipe ):
             # - where to store
             filepathout = io.get_daily_flatfile(s_["day"],ccdid=s_["ccdid"], ledid=s_["ledid"]) 
             # - loads the builder for these files in
-            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=False, persist=False)
+            fbuilder = CalibrationBuilder.from_filenames(filesint, raw=raw,
+                                                             as_path=False,
+                                                             persist=False)
             # - build the merged image and store it, returning the storing path
             fileout_ = fbuilder.build_and_store(filepathout, incl_header=True, 
                                                 header_keys=header_keys, **kwargs)
@@ -84,7 +88,7 @@ class FlatPipe( BasePipe ):
             # loop over entires (per led, per day per CCD)
             filesint = s_["path_dailyflat"] # raw files in
             filepathout = io.get_period_flatfile(*self.period, ccdid=s_["ccdid"], ledid=s_["ledid"]) # where to store
-            fbuilder = CalibrationBuilder.from_rawfiles(filesint, as_path=True, persist=False) # loads the builder
+            fbuilder = CalibrationBuilder.from_filenames(filesint, as_path=True, persist=False, raw=False) # loads the builder
             fileout_ = fbuilder.build_and_store(filepathout, incl_header=False,  # header not ready
                                                 **kwargs) # build and store | but delayed
             files_out.append(fileout_)

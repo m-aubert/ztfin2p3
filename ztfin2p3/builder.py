@@ -1,5 +1,6 @@
 """ Top level calibration builder class """
 
+import warnings
 import numpy as np
 class CalibrationBuilder( object ): # /day /week /month
 
@@ -11,7 +12,9 @@ class CalibrationBuilder( object ): # /day /week /month
     #  I/O           # 
     # ============== #
     @classmethod
-    def from_rawfiles(cls, rawfiles, persist=False, as_path=False, **kwargs):
+    def from_filenames(cls, filenames, use_dask=True,
+                           persist=False, as_path=False,
+                           raw=False, **kwargs):
         """ 
         as_path: [bool] -optional-
             if as_path is False, then rawfile=io.get_file(rawfile) is used.
@@ -20,12 +23,34 @@ class CalibrationBuilder( object ): # /day /week /month
             If you know the file exists, use as_path=True.
         
         """
-        from ztfimg import raw
-        flatcollection = raw.RawCCDCollection.from_filenames(rawfiles, persist=persist,
-                                                             as_path=as_path,
-                                                             **kwargs)
+        from ztfimg import collection
+        if raw:
+            CcdCollection = collection.RawCCDCollection
+        else:
+            CcdCollection = collection.CCDCollection
+            
+        flatcollection = CcdCollection.from_filenames(rawfiles, use_dask=use_dask,
+                                                      persist=persist, as_path=as_path, **kwargs)
         return cls(flatcollection)
 
+        
+    @classmethod
+    def from_rawfiles(cls, rawfiles, use_dask=True, persist=False, as_path=False, **kwargs):
+        """ 
+        as_path: [bool] -optional-
+            if as_path is False, then rawfile=io.get_file(rawfile) is used.
+            the enables to automatically download the missing file but work
+            only for IPAC-pipeline based file. It add a (small) overhead.
+            If you know the file exists, use as_path=True.
+        
+        """
+        warnings.warn("DEPREDATED, from_rawfiles(files) is deprecated, use from_filenames(files, raw=True)")
+        
+        return cls.from_filenames(rawfiles, raw=True,
+                                      use_dask=use_dask,
+                                      persist=persist, as_path=as_path,
+                                      **kwargs)
+    
     def to_fits(self, fileout, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format """
         return self._to_fits(fileout, self.data, header=self.header,

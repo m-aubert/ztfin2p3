@@ -1,2 +1,2 @@
 
-from flatpipe import *
+from .flatpipe import *

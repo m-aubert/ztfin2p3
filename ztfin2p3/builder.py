@@ -29,7 +29,7 @@ class CalibrationBuilder( object ): # /day /week /month
         else:
             CcdCollection = collection.CCDCollection
             
-        flatcollection = CcdCollection.from_filenames(rawfiles, use_dask=use_dask,
+        flatcollection = CcdCollection.from_filenames(filenames, use_dask=use_dask,
                                                       persist=persist, as_path=as_path, **kwargs)
         return cls(flatcollection)
 

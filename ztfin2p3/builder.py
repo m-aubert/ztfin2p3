@@ -114,12 +114,12 @@ class CalibrationBuilder( object ): # /day /week /month
                   set_it=False, incl_header=True,
                   header_keys=None,
                   dask_on_header=False, **kwargs):
-        """ **kwargs goes to imgcollection.get_data_mean """
+        """ **kwargs goes to imgcollection.get_meandata """
         # This could be updated in the calibration function #
         
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl),
                 **kwargs}
-        data = self.imgcollection.get_data_mean(**prop)
+        data = self.imgcollection.get_meandata(**prop)
         if incl_header:
             header = self.build_header(keys=header_keys,
                                        use_dask=dask_on_header)

@@ -218,6 +218,7 @@ class CalibrationBuilder( object ): # /day /week /month
     # -------- #
     def build_and_store(self, fileout, overwrite=True, 
                         corr_nl=True, corr_overscan=True,
+                        chunkreduction=2,
                         set_it=False, incl_header=True,
                         header_keys=None, **kwargs):
         """ build the data and store them into a fits file.
@@ -239,6 +240,10 @@ class CalibrationBuilder( object ): # /day /week /month
             Should the data be corrected for overscan
             (if both corr_overscan and corr_nl are true,
             corr_nl is applied first)
+
+        chunkreduction: int
+            rechunk and split of the image.
+            If None, no rechunk
 
         set_it: bool
             should data created by this method be set as self.data
@@ -267,6 +272,7 @@ class CalibrationBuilder( object ): # /day /week /month
         """
         # Build
         data, header = self.build(corr_nl=corr_nl, corr_overscan=corr_overscan,
+                                  chunkreduction=chunkreduction,
                                   header_keys=header_keys,
                                   set_it=False, incl_header=incl_header,
                                   **kwargs)
@@ -283,7 +289,7 @@ class CalibrationBuilder( object ): # /day /week /month
     
     def build(self, corr_nl=True, corr_overscan=True,
                   set_it=False, incl_header=True,
-                  header_keys=None,
+                  header_keys=None, chunkreduction=2,
                   dask_on_header=False, **kwargs):
         """ build the mean data.
 
@@ -296,6 +302,10 @@ class CalibrationBuilder( object ): # /day /week /month
             Should the data be corrected for overscan
             (if both corr_overscan and corr_nl are true,
             corr_nl is applied first)
+
+        chunkreduction: int
+            rechunk and split of the image.
+            If None, no rechunk
 
         set_it: bool
             should data created by this method be set as self.data
@@ -327,7 +337,8 @@ class CalibrationBuilder( object ): # /day /week /month
         
         # This could be updated in the calibration function #
         
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl),
+        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
+                       chunkreduction=chunkreduction),
                 **kwargs}
         data = self.imgcollection.get_meandata(**prop)
         if incl_header:

@@ -4,7 +4,7 @@
 # Keys
 title = "calibration config"
 
-periods = [["20190301","20190430"]]
+periods = [["20190301","20190402"]]
 
 bad = []
 

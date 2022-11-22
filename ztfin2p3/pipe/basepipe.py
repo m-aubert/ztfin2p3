@@ -108,7 +108,9 @@ class CalibPipe( BasePipe ):
             else:
                 prop =  dict(ccdid=s_["ccdid"])
 
-            filepathout = io.get_daily_flatfile(s_["day"], **prop) 
+            filepathout = getattr(io,f"get_daily_{self.KIND}file")(s_["day"], **prop)
+            
+                
             # - loads the builder for these files in
             fbuilder = CalibrationBuilder.from_filenames(filesint, raw=raw,
                                                              as_path=False,

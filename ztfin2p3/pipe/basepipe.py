@@ -111,7 +111,7 @@ class CalibPipe( BasePipe ):
             else:
                 prop =  dict(ccdid=s_["ccdid"])
 
-            filepathout = getattr(io,f"get_daily_{self.KIND}file")(s_["day"], **prop)
+            filepathout = getattr(io,f"get_daily_{self._KIND}file")(s_["day"], **prop)
             
                 
             # - loads the builder for these files in

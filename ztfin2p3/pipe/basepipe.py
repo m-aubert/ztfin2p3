@@ -119,7 +119,7 @@ class CalibPipe( BasePipe ):
                                                              as_path=False,
                                                              persist=False)
             # - build the merged image and store it, returning the storing path
-            fileout_ = fbuilder.build_and_store(filepathout, incl_header=True, 
+            fileout_ = fbuilder.build_and_store(filepathout, incl_header=True,
                                                 header_keys=header_keys, **kwargs)
             # - append the storing path
             files_out.append(fileout_)
@@ -155,6 +155,31 @@ class CalibPipe( BasePipe ):
         return datafile
 
         
+    def run_dailymerge(use_dask=True, verbose=True, **kwargs):
+        """ This loops over day and run per day one at the time."""
+
+        import dask
+        #
+        # For N days in the period
+        #
+        datafile = self.get_init_datafile()
+        # --------
+        # Step 1.
+        # build from per day, per led and per ccd
+        #    = N x 11 x 16 flats
+        #    --> N x 11 x 16
+        daily_outputs = self.run_perday(datafile)
+        perday_list = daily_outputs.groupby("day")["path_daily"].apply(list)
+
+        outputs = []
+        for i, day_daily in daily_outputs.groupby("day")["path_daily"].apply(list).iteritems():
+            if verbose:
+                print(i)
+            out_day = dask.delayed(list)(day_daily).compute()
+            outputs.append(out_day)
+
+        return outputs
+            
         
     def run(self, use_dask=True):
         """ """

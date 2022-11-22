@@ -155,7 +155,7 @@ class CalibPipe( BasePipe ):
         return datafile
 
         
-    def run_dailymerge(use_dask=True, verbose=True, **kwargs):
+    def run_dailymerge(self,use_dask=True, verbose=True, **kwargs):
         """ This loops over day and run per day one at the time."""
 
         import dask

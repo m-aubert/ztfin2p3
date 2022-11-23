@@ -1,5 +1,6 @@
 """ Top level calibration builder class """
 
+import os        
 import warnings
 import numpy as np
 
@@ -110,7 +111,10 @@ class CalibrationBuilder( object ): # /day /week /month
         """
         if header is None:
             header = self.header
-            
+
+        if not os.path.isdir(dirout):
+            os.makedirs(dirout, exist_ok=True)
+
         return self._to_fits(fileout, self.data, header=header,
                                  overwrite=overwrite,
                                  **kwargs)
@@ -138,12 +142,7 @@ class CalibrationBuilder( object ): # /day /week /month
         str
             the input fileout
         """
-        import os        
         from astropy.io import fits
-        dirout = os.path.dirname(fileout)
-        if not os.path.isdir(dirout):
-            os.makedirs(dirout, exist_ok=True)
-
         fits.writeto(fileout, data, header=header,
                          overwrite=overwrite, **kwargs)
         return fileout
@@ -276,6 +275,8 @@ class CalibrationBuilder( object ): # /day /week /month
                                   header_keys=header_keys,
                                   set_it=False, incl_header=incl_header,
                                   **kwargs)
+
+        data = data.persist() # needed to force the good graph
         
         if "dask" in str(type(data)): # is a dask object
             import dask
@@ -340,6 +341,7 @@ class CalibrationBuilder( object ): # /day /week /month
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
                        chunkreduction=chunkreduction),
                 **kwargs}
+            
         data = self.imgcollection.get_meandata(**prop)
         if incl_header:
             header = self.build_header(keys=header_keys,

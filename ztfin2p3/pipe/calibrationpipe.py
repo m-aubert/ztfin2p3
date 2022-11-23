@@ -7,10 +7,12 @@ from .. import io
 #     - datafile and co.
 #     - use_dask
 
-__all__ = ["BiasPipe"]
+__all__ = ["FlatPipe", "BiasPipe"]
+
+
+class FlatPipe( CalibPipe ):
+    _KIND = "flat"
 
 
 class BiasPipe( CalibPipe ):
     _KIND = "bias"
-
-    

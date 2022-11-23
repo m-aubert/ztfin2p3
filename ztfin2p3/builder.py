@@ -276,7 +276,7 @@ class CalibrationBuilder( object ): # /day /week /month
                                   set_it=False, incl_header=incl_header,
                                   **kwargs)
 
-        data = data.persist() # needed to force the good graph
+        #data = data.persist() # needed to force the good graph
         
         if "dask" in str(type(data)): # is a dask object
             import dask

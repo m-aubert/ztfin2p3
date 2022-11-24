@@ -160,8 +160,11 @@ def get_directory(kind, subkind):
         return SCIENCE_DIR
     
 # =========== #
-#  BIAS       #
+# Calibration #
 # =========== #
+# ------- #
+#  Daily  #
+# ------- #
 def get_daily_biasfile(day, ccdid):
     """ 
     day: 
@@ -181,13 +184,114 @@ def get_daily_biasfile(day, ccdid):
     return os.path.join(BIAS_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
 
+
+# ------- #
+# Period  #
+# ------- #
+def get_period_biasfile(start, end, ccdid):
+    """ get the period bias filepath
+
+    
+    format: cal/bias/yyyymmddyyyymmdd/ztfin2p3_yyyymmddyyyymmdd_000000_bi_ccdid_bias.fits
+
+    Parameters
+    ----------
+    start: str
+        period start. Accepted formats
+         - yyyy-mm-dd
+         - yyyymmdd
+         
+    end: str
+        period end. Accepted formats
+         - yyyy-mm-dd
+         - yyyymmdd 
+
+    ccdid: int
+        ccd id (1->16)
+
+    Returns
+    -------
+    str
+        fullpath to the period bias flat for the ccdid.
+
+    """
+    # so it accepts this format yyyy-mm-ddand yyyymmdd
+    start = str(start).replace("-","") 
+    end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
+
+    period = f"{start}{end}"
+    filestructure = f"ztfin2p3_{period}_000000_bi_c{ccdid:02d}_bias.fits.fz'"
+    
+    return os.path.join(BIAS_DIR, period, filestructure)
+
+    
+def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
+    """ get the period flat filepath
+
+    format: cal/flat/yyyymmddyyyymmdd/ztfin2p3_yyyymmddyyyymmdd_000000_filtername_ccdid_[ledid_]flat.fits
+
+    Parameters
+    ----------
+    start: str
+        period start. Accepted formats
+         - yyyy-mm-dd
+         - yyyymmdd
+         
+    end: str
+        period end. Accepted formats
+         - yyyy-mm-dd
+         - yyyymmdd 
+
+    ccdid: int
+        ccd id (1->16)
+
+    filtername: str or None
+       = must be given if ledid is None =
+        name of the filter (zg, zr, zi)
+
+    ledid: int or None
+       = must be given if filtername is None =
+    Returns
+    -------
+    str
+        fullpath to the period bias flat for the ccdid.
+
+    """
+    noled = (ledid is None)
+    if noled and filtername is None:
+        raise ValueError("ledid and filtername cannot be both None")
+      
+    elif filtername is None:
+        from .calibration.flat import ledid_to_filtername
+        filtername = ledid_to_filtername(ledid)
+        
+        
+    start = str(start).replace("-","") # so it accepts this format yyyy-mm-ddand yyyymmdd
+    end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
+
+    period = f"{start}{end}"
+
+
+    filestructure = f"ztfin2p3_{period}_000000_{filtername}_c{ccdid:02d}"
+    
+    if noled:
+        filestructure +="_flat.fits" 
+    else:
+        filestructure +=f"_l{ledid:02d}_flat.fits"
+
+
+        
+    return os.path.join(FLAT_DIR, period, filestructure)
+
+
 # =========== #
 #  FLAT       #
 # =========== #
 def get_flat_for_exposure(yyyymmdd, filtername):
     """ """
     raise NotImplementedError("to be implemented with config.")
-    
+
+
 def get_daily_flatfile(day, ccdid, filtername=None, ledid=None):
     """ 
     day: 
@@ -217,35 +321,8 @@ def get_daily_flatfile(day, ccdid, filtername=None, ledid=None):
     return os.path.join(FLAT_DIR, f"{yyyy:04d}",f"{mm:02d}{dd:02d}", 
                         filestructure)
 
-def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
-    """
-    start, end:
-        period boundaries
-        accepted formats
-         - yyyy-mm-dd
-         - yyyymmdd
-    
-    format: cal/flat/yyyy/mmdd/ztfin2p3_yyyymmddyyyymmdd_000000_filtername_ccdid_ledid_flat.fits
-    """
-    noled= (ledid is None)
-    if noled and filtername is None:
-        raise ValueError("ledid and filtername cannot be both None")
-      
-    elif filtername is None:
-        from .calibration.flat import ledid_to_filtername
-        filtername = ledid_to_filtername(ledid)
-        
-    start = str(start).replace("-","") # so it accepts this format yyyy-mm-ddand yyyymmdd
-    end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
 
-    filestructure = f"ztfin2p3_{start}{end}_000000_{filtername}_c{ccdid:02d}"
-    if noled:
-        filestructure +="_flat.fits" 
-    else:
-        filestructure +=f"_l{ledid:02d}_flat.fits" 
-    return filestructure
 
-    
 # =========== #
 #  StarFlat   #
 # =========== #

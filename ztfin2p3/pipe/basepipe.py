@@ -76,14 +76,33 @@ class CalibPipe( BasePipe ):
     #   Methods      #
     # ============== #
     def get_fileout(self, ccdid, **kwargs):
-        """ """
+        """ get the file to be written to store the period ccd product
+        (see get_ccd)
+
+        Parameters
+        ----------
+        ccdid: int
+            id of the ccd (1->16)
+
+        **kwargs goes to io.get_period_{kind}file
+
+        Returns
+        -------
+        str
+            fullpath
+
+        See also
+        --------
+        get_ccd: get a ztfimg.ccd object for the given ccdid(s).
+        """
         if self.pipekind == "bias":
             fileout = io.get_period_biasfile(*self.period, ccdid=ccdid)
         elif self.pipkind == "flat":
             fileout = io.get_period_flatfile(*self.period, ccdid=ccdid, **kwargs)
         else:
             raise NotImplementedError(f"only bias and flat kinds implemented ; this is {self.pipekind}")
-        
+
+        return fileout
     # ----------------- #
     #  High-Level build #
     # ----------------- #

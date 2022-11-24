@@ -79,7 +79,6 @@ class CalibPipe( BasePipe ):
         """ """
         return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
 
-
     def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None):
         """ """
 
@@ -105,7 +104,33 @@ class CalibPipe( BasePipe ):
         datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
         self.set_datafile(datafile) 
         
+    # ================= #
+    #   High-Level      #
+    # ================= #
+    def get_ccd(self, ccdid=None, as_dict=False, mergestats="mean"):
+        """ """
+        if ccdid is None:
+            ccdid = np.arange(1,17)
+        else:
+            ccdid = np.atleast_1d(ccdid)
+
+        # list of stacked CCD array Nx6000x6000
+        stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, as_dict=False)
+        ccds = [ztfimg.CCD.from_data( getattr(da,mergestats)(stacked_ccd_, axis=0) )
+                    for stacked_ccd_ in stacked_ccds]
+
+        if as_dict:
+            return dict(zip(ccdid, ccds))
         
+        return ccds
+
+    def get_focalplane(self, mergestats="mean"):
+        """ """
+        ccdid = np.arange(1,17)
+        ccds = self.get_ccd(ccdid=ccdid, as_dict=False)
+        focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdid)
+        return focal_plane
+
     def get_stacked_ccdarray(self, ccdid=None, as_dict=False):
         """ """
         ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
@@ -123,23 +148,6 @@ class CalibPipe( BasePipe ):
 
         return arrays_
 
-    def get_ccd(self, ccdid=None, as_dict=False, mergestats="mean"):
-        """ """
-        if ccdid is None:
-            ccdid = np.arange(1,17)
-        else:
-            ccdid = np.atleast_1d(ccdid)
-
-        # list of stacked CCD array Nx6000x6000
-        stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, as_dict=False)
-        ccds = [ztfimg.CCD.from_data( getattr(da,mergestats)(stacked_ccd_, axis=0) )
-                    for stacked_ccd_ in stacked_ccds]
-
-        if as_dict:
-            return dict(zip(ccdid, ccds))
-        
-        return ccds
-        
     def get_daily_focalplane(self, day=None, as_dict=False):
         """ """
         day_list = self.init_datafile.reset_index().groupby("day")["index"].apply(list)

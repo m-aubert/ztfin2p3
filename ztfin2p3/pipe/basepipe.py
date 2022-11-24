@@ -102,10 +102,10 @@ class CalibPipe( BasePipe ):
         data_outs = []
         for i_, s_ in datafile.iterrows():
             # loop over entires (per led, per day per CCD)
-            filesin = 
+            filesin = s_["filepath"]
             
             # - loads the builder for these files in
-            fbuilder = CalibrationBuilder.from_filenames(s_["filepath"],
+            fbuilder = CalibrationBuilder.from_filenames(filesin,
                                                          raw=raw,
                                                          as_path=True,
                                                          persist=False)

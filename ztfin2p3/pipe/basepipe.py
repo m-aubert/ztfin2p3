@@ -83,7 +83,8 @@ class CalibPipe( BasePipe ):
         """ """
 
         prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction)
-        
+
+        data_outs = []
         for i_, s_ in self.init_datafile.iterrows():
             filesin = s_["filepath"]
             fbuilder = CalibrationBuilder.from_filenames(filesin,

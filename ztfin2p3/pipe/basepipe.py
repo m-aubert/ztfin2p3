@@ -120,7 +120,7 @@ class CalibPipe( BasePipe ):
             # - build the merged image and store it, returning the storing path
             data, _ = fbuilder.build(incl_header=False, **kwargs)
             # - append the storing path
-            files_out.append(fileout_)
+            files_out.append(filepathout)
             data_outs.append(data)
 
             datafile["path_daily"] = files_out

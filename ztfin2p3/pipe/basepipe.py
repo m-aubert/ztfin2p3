@@ -88,19 +88,18 @@ class CalibPipe( BasePipe ):
     def run_perday(self, datafile=None, raw=True, **kwargs):
         """ """
         datafile = datafile.copy()
-        header_keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
-                           "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
-                           "FRAMENUM", "PROGRMID","FILTERID",
-                           "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-        if self.pipekind == "flat":
-            header_keys += ["ILUM_LED", "ILUMWAVE"]
-            
-        
-        
+#        header_keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
+#                           "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
+#                           "FRAMENUM", "PROGRMID","FILTERID",
+#                           "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
+#        if self.pipekind == "flat":
+#            header_keys += ["ILUM_LED", "ILUMWAVE"]
+                   
         if datafile is None:
             datafile = self.get_init_datafile()
         
         files_out = []
+        data_outs = []
         for i_, s_ in datafile.iterrows():
             # loop over entires (per led, per day per CCD)
             # - raw files in
@@ -112,19 +111,21 @@ class CalibPipe( BasePipe ):
                 prop =  dict(ccdid=s_["ccdid"])
 
             filepathout = getattr(io,f"get_daily_{self.pipekind}file")(s_["day"], **prop)
-            
+            files_out.append(filepathout)
                 
             # - loads the builder for these files in
             fbuilder = CalibrationBuilder.from_filenames(filesin, raw=raw,
                                                              as_path=True,
                                                              persist=False)
             # - build the merged image and store it, returning the storing path
-            fileout_ = fbuilder.build_and_store(filepathout, incl_header=True,
-                                                header_keys=header_keys, **kwargs)
+            data, _ = fbuilder.build(incl_header=False, **kwargs)
             # - append the storing path
             files_out.append(fileout_)
-        
-        datafile["path_daily"] = files_out
+            data_outs.append(data)
+
+            datafile["path_daily"] = files_out
+            datafile["data_daily"] = data_outs
+            
         return datafile
     
     def merge_daily(self, daily_datafile, **kwargs):

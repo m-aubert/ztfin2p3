@@ -102,28 +102,19 @@ class CalibPipe( BasePipe ):
         data_outs = []
         for i_, s_ in datafile.iterrows():
             # loop over entires (per led, per day per CCD)
-            # - raw files in
-            filesin = s_["filepath"] 
-            # - where to store
-            if self.pipekind == "flat":
-                prop =  dict(ccdid=s_["ccdid"], ledid=s_["ledid"])
-            else:
-                prop =  dict(ccdid=s_["ccdid"])
-
-            filepathout = getattr(io,f"get_daily_{self.pipekind}file")(s_["day"], **prop)
-            files_out.append(filepathout)
-                
+            filesin = 
+            
             # - loads the builder for these files in
-            fbuilder = CalibrationBuilder.from_filenames(filesin, raw=raw,
-                                                             as_path=True,
-                                                             persist=False)
+            fbuilder = CalibrationBuilder.from_filenames(s_["filepath"],
+                                                         raw=raw,
+                                                         as_path=True,
+                                                         persist=False)
             # - build the merged image and store it, returning the storing path
             data, _ = fbuilder.build(incl_header=False, **kwargs)
             # - append the storing path
-            files_out.append(filepathout)
             data_outs.append(data)
 
-            datafile["path_daily"] = files_out
+#            datafile["path_daily"] = files_out
             datafile["data_daily"] = data_outs
             
         return datafile

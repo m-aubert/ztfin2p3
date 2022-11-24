@@ -2,6 +2,8 @@
 from ..builder import CalibrationBuilder
 from .. import io
 
+import ztfimg
+import dask.array as da
 
 
 class BasePipe( object ):
@@ -54,6 +56,7 @@ class CalibPipe( BasePipe ):
         """ """
         super().__init__(use_dask=use_dask) # __init__ of BasePipe
         self._period = period
+        self._init_datafile = self.get_init_datafile()
         
     @classmethod
     def from_period(cls, start, end, use_dask=True, **kwargs):
@@ -72,6 +75,27 @@ class CalibPipe( BasePipe ):
     # ============== #
     #   Methods      #
     # ============== #
+    def get_init_datafile(self):
+        """ """
+        return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
+
+
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None):
+        """ """
+
+        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction)
+        
+        for i_, s_ in self.init_datafile.iterrows():
+            filesin = s_["filepath"]
+            fbuilder = CalibrationBuilder.from_filenames(filesin,
+                                                         raw=True,
+                                                         as_path=True,
+                                                         persist=False)
+            data, _ = fbuilder.build(**prop)
+            data_outs.append(data)
+
+        self._daily_ccds = data_outs
+    
     def load_metadata(self, period=None, **kwargs):
         """ """
         from ztfin2p3 import metadata        
@@ -80,139 +104,46 @@ class CalibPipe( BasePipe ):
         datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
         self.set_datafile(datafile) 
         
-    
-    def get_init_datafile(self):
-        """ """
-        return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
-    
-    def run_perday(self, datafile=None, raw=True, **kwargs):
-        """ """
-        datafile = datafile.copy()
-#        header_keys = ["ORIGIN","OBSERVER","INSTRUME","IMGTYPE","EXPTIME",
-#                           "CCDSUM","CCD_ID","CCDNAME","PIXSCALE","PIXSCALX","PIXSCALY",
-#                           "FRAMENUM", "PROGRMID","FILTERID",
-#                           "FILTER","FILTPOS","RA","DEC", "OBSERVAT"]
-#        if self.pipekind == "flat":
-#            header_keys += ["ILUM_LED", "ILUMWAVE"]
-                   
-        if datafile is None:
-            datafile = self.get_init_datafile()
         
-        files_out = []
-        data_outs = []
-        for i_, s_ in datafile.iterrows():
-            # loop over entires (per led, per day per CCD)
-            filesin = s_["filepath"]
-            
-            # - loads the builder for these files in
-            fbuilder = CalibrationBuilder.from_filenames(filesin,
-                                                         raw=raw,
-                                                         as_path=True,
-                                                         persist=False)
-            # - build the merged image and store it, returning the storing path
-            data, _ = fbuilder.build(incl_header=False, **kwargs)
-            # - append the storing path
-            data_outs.append(data)
-
-#            datafile["path_daily"] = files_out
-            datafile["data_daily"] = data_outs
-            
-        return datafile
-    
-    def merge_daily(self, daily_datafile, **kwargs):
+    def get_stacked_ccdarray(self, ccdid=None, as_dict=False):
         """ """
-        if self.pipekind == "flat": # incl LED
-            datafile = daily_datafile.groupby(["ccdid","ledid"]
-                                             )["path_daily"].apply(list).reset_index()
+        ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
+
+        if ccdid is None:
+            ccdid = np.arange(1,17)
         else:
-            datafile = daily_datafile.groupby("ccdid")["path_daily"].apply(list).reset_index()
-        
-        files_out = []
-        for i_, s_ in datafile.iterrows():
-            # loop over entires (per led, per day per CCD)
-            filesint = s_["path_daily"] # raw files in
-            if self.pipekind == "flat":
-                prop =  dict(ccdid=s_["ccdid"], ledid=s_["ledid"])
-            else:
-                prop =  dict(ccdid=s_["ccdid"])
-                
-            filepathout = io.get_period_flatfile(*self.period, **prop) # where to store
-            fbuilder = CalibrationBuilder.from_filenames(filesint, as_path=True,
-                                                             persist=False, raw=False) # loads the builder
-            fileout_ = fbuilder.build_and_store(filepathout, incl_header=False,  # header not ready
-                                                **kwargs) # build and store | but delayed
-            files_out.append(fileout_)
-        
-        datafile["path_period"] = files_out
-        return datafile
+            ccdid = np.atleast_1d(ccdid)
 
-        
-    def run_dailymerge(self,use_dask=True, verbose=True, **kwargs):
-        """ This loops over day and run per day one at the time."""
+        arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
+                      if (list_id:=ccdid_list.get(ccdid_)) is not None else None
+                      for ccdid_ in ccdid]
+        if as_dict:
+            return dict(zip(ccdid,arrays_))
 
-        import dask
-        #
-        # For N days in the period
-        #
-        datafile = self.get_init_datafile()
-        # --------
-        # Step 1.
-        # build from per day, per led and per ccd
-        #    = N x 11 x 16 flats
-        #    --> N x 11 x 16
-        daily_outputs = self.run_perday(datafile)
-        perday_list = daily_outputs.groupby("day")["path_daily"].apply(list)
+        return arrays_
 
-        outputs = []
-        for i, day_daily in daily_outputs.groupby("day")["path_daily"].apply(list).iteritems():
-            if verbose:
-                print(i)
-            out_day = dask.delayed(list)(day_daily).compute()
-            outputs.append(out_day)
-
-        return outputs
-            
-        
-    def run(self, use_dask=True):
+    def get_daily_focalplane(self, day=None, as_dict=False):
         """ """
-        #
-        # For N days in the period
-        #
-        datafile = self.get_init_datafile()
-        # --------
-        # Step 1.
-        # build from per day, per led and per ccd
-        #    = N x 11 x 16 flats
-        #    --> N x 11 x 16
-        daily_outputs = self.run_perday(datafile)
+        day_list = self.init_datafile.reset_index().groupby("day")["index"].apply(list)
 
-        # --------        
-        # Step 2.        
-        # merge flat per period, per led and per ccd
-        #    = 11 x 16 flats x 2 (i.e. per norm)
-        #  - normed per CCD 
-        #  - normed per focal plane
-        #    --> 11 x 16 x 2 stored (per quadrant)
-        periodled_outputs = self.merge_daily(daily_outputs)
-        return periodled_outputs
+        if day is None:
+            days = day_list.index
+        else:
+            days = np.atleast_1d(day)
+
+        focal_planes = []
+        for day_ in days:
+            day_index = day_list.loc[day_]
+            ccdids = self.init_datafile.loc[day_index]["ccdid"].values
+            ccds = [ztfimg.CCD.from_data(self.daily_ccds[i]) for i in day_index]
+            focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdids)
+            focal_planes.append(focal_plane)
+
+        if as_dict:
+            return dict(zip(days, focal_planes) )
         
-        # --------        
-        # Step 3.        
-        # merge flat per period, per led and per ccd
-        #    = 11 x 16 flats x 2 (i.e. per norm)
-        #  - normed per CCD 
-        #  - normed per focal plane
-        #    --> 11 x 64 x 2 stored (per quadrant)
-        
-        
-        # --------
-        # Step 3.        
-        # merge led per filter
-        #    = 3 * 16 flats x 2 (i.e. per norm)
-        #  - per ccd
-        #  - per focal plane
-        #    --> 3 x 64 (stored per quadrant)
-        
+        return focal_planes
+    
     # ============== #
     #  Property      #
     # ============== #
@@ -223,3 +154,16 @@ class CalibPipe( BasePipe ):
             return None
         
         return self._period
+
+    @property
+    def daily_ccds(self):
+        """ """
+        if not hasattr(self, "_daily_ccds"):
+            raise AttributeError("_daily_ccds not available. run 'build_daily_ccds' ")
+        
+        return self._daily_ccds
+        
+    @property
+    def init_datafile(self):
+        """ """
+        return self._init_datafile

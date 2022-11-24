@@ -1,10 +1,11 @@
-
 from ..builder import CalibrationBuilder
 from .. import io
 
-import ztfimg
+
+import numpy as np
 import dask.array as da
 
+import ztfimg
 
 class BasePipe( object ):
     _KIND = "_base_"
@@ -122,6 +123,23 @@ class CalibPipe( BasePipe ):
 
         return arrays_
 
+    def get_ccd(self, ccdid=None, as_dict=False, mergestats="mean"):
+        """ """
+        if ccdid is None:
+            ccdid = np.arange(1,17)
+        else:
+            ccdid = np.atleast_1d(ccdid)
+
+        # list of stacked CCD array Nx6000x6000
+        stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, as_dict=False)
+        ccds = [ztfimg.CCD.from_data( getattr(da,mergestats)(stacked_ccd_, axis=0) )
+                    for stacked_ccd_ in stacked_ccds]
+
+        if as_dict:
+            return dict(zip(ccdid, ccds))
+        
+        return ccds
+        
     def get_daily_focalplane(self, day=None, as_dict=False):
         """ """
         day_list = self.init_datafile.reset_index().groupby("day")["index"].apply(list)

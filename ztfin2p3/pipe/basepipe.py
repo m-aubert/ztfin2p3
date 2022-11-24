@@ -75,38 +75,18 @@ class CalibPipe( BasePipe ):
     # ============== #
     #   Methods      #
     # ============== #
-    def get_init_datafile(self):
+    def get_fileout(self, ccdid, **kwargs):
         """ """
-        return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
-
-    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None):
-        """ """
-
-        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction)
-
-        data_outs = []
-        for i_, s_ in self.init_datafile.iterrows():
-            filesin = s_["filepath"]
-            fbuilder = CalibrationBuilder.from_filenames(filesin,
-                                                         raw=True,
-                                                         as_path=True,
-                                                         persist=False)
-            data, _ = fbuilder.build(**prop)
-            data_outs.append(data)
-
-        self._daily_ccds = data_outs
-    
-    def load_metadata(self, period=None, **kwargs):
-        """ """
-        from ztfin2p3 import metadata        
-        if period is None and self._period is None:
-            raise ValueError("no period given and none known")
-        datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
-        self.set_datafile(datafile) 
+        if self.pipekind == "bias":
+            fileout = io.get_period_biasfile(*self.period, ccdid=ccdid)
+        elif self.pipkind == "flat":
+            fileout = io.get_period_flatfile(*self.period, ccdid=ccdid, **kwargs)
+        else:
+            raise NotImplementedError(f"only bias and flat kinds implemented ; this is {self.pipekind}")
         
-    # ================= #
-    #   High-Level      #
-    # ================= #
+    # ----------------- #
+    #  High-Level build #
+    # ----------------- #
     def get_ccd(self, ccdid=None, as_dict=False, mergestats="mean"):
         """ """
         if ccdid is None:
@@ -130,7 +110,10 @@ class CalibPipe( BasePipe ):
         ccds = self.get_ccd(ccdid=ccdid, as_dict=False)
         focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdid)
         return focal_plane
-
+    
+    # ----------------- #
+    #  Mid-Level build  #
+    # ----------------- #        
     def get_stacked_ccdarray(self, ccdid=None, as_dict=False):
         """ """
         ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
@@ -169,7 +152,41 @@ class CalibPipe( BasePipe ):
             return dict(zip(days, focal_planes) )
         
         return focal_planes
+        
+        
+    # ----------------- #
+    #   Structural      #
+    # ----------------- #
+    def get_init_datafile(self):
+        """ """
+        return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
+
+    def load_metadata(self, period=None, **kwargs):
+        """ """
+        from ztfin2p3 import metadata        
+        if period is None and self._period is None:
+            raise ValueError("no period given and none known")
+        datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
+        self.set_datafile(datafile) 
+        
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None):
+        """ """
+
+        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction)
+
+        data_outs = []
+        for i_, s_ in self.init_datafile.iterrows():
+            filesin = s_["filepath"]
+            fbuilder = CalibrationBuilder.from_filenames(filesin,
+                                                         raw=True,
+                                                         as_path=True,
+                                                         persist=False)
+            data, _ = fbuilder.build(**prop)
+            data_outs.append(data)
+
+        self._daily_ccds = data_outs
     
+
     # ============== #
     #  Property      #
     # ============== #

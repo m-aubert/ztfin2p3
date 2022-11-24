@@ -188,7 +188,7 @@ def get_daily_biasfile(day, ccdid):
 # ------- #
 # Period  #
 # ------- #
-def get_period_biasfile(start, end, ccdid, mkdirs=True):
+def get_period_biasfile(start, end, ccdid, mkdirs=False):
     """ get the period bias filepath
 
     

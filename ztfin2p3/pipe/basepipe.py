@@ -56,7 +56,6 @@ class CalibPipe( BasePipe ):
         """ """
         super().__init__(use_dask=use_dask) # __init__ of BasePipe
         self._period = period
-#        self._init_datafile = self.get_init_datafile()
         
     @classmethod
     def from_period(cls, start, end, use_dask=True, **kwargs):
@@ -166,4 +165,7 @@ class CalibPipe( BasePipe ):
     @property
     def init_datafile(self):
         """ """
+        if not hasattr(self,"_init_datafile") or self._init_datafile is None:
+            self._init_datafile = self.get_init_datafile()
+            
         return self._init_datafile

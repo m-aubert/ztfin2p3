@@ -103,72 +103,53 @@ class CalibPipe( BasePipe ):
             raise NotImplementedError(f"only bias and flat kinds implemented ; this is {self.pipekind}")
 
         return fileout
+    
     # ----------------- #
     #  High-Level build #
     # ----------------- #
-    def get_ccd(self, ccdid=None, as_dict=False, mergestats="mean"):
+    def get_ccd(self, ccdid=None, mergestats="mean", **kwargs):
         """ """
-        if ccdid is None:
-            ccdid = np.arange(1,17)
-        else:
-            ccdid = np.atleast_1d(ccdid)
-
         # list of stacked CCD array Nx6000x6000
-        stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, as_dict=False)
+        ccdids, stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, **kwargs)
         ccds = [ztfimg.CCD.from_data( getattr(da,mergestats)(stacked_ccd_, axis=0) )
                     for stacked_ccd_ in stacked_ccds]
-
-        if as_dict:
-            return dict(zip(ccdid, ccds))
         
-        return ccds
+        return ccdids, ccds
 
     def get_focalplane(self, mergestats="mean"):
         """ """
-        ccdid = np.arange(1,17)
-        ccds = self.get_ccd(ccdid=ccdid, as_dict=False)
+        ccdids, ccds = self.get_ccd()
         focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdid)
         return focal_plane
     
     # ----------------- #
     #  Mid-Level build  #
     # ----------------- #        
-    def get_stacked_ccdarray(self, ccdid=None, as_dict=False):
+    def get_stacked_ccdarray(self, ccdid=None):
         """ """
         ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
-
-        if ccdid is None:
-            ccdid = np.arange(1,17)
-        else:
-            ccdid = np.atleast_1d(ccdid)
-
+        if ccdid is not None:
+            ccdid_list = ccdid_list.loc[ccdid]
+        
         arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
-                      if (list_id:=ccdid_list.get(ccdid_)) is not None else None
-                      for ccdid_ in ccdid]
-        if as_dict:
-            return dict(zip(ccdid,arrays_))
+                    for list_id in ccdid_list.values]
+        
+        return ccdid_list.index.values, arrays_
 
-        return arrays_
-
-    def get_daily_focalplane(self, day=None, as_dict=False):
+    def get_daily_focalplane(self, day=None):
         """ """
         day_list = self.init_datafile.reset_index().groupby("day")["index"].apply(list)
 
-        if day is None:
-            days = day_list.index
-        else:
-            days = np.atleast_1d(day)
+        
+        if day is not None:
+            day_list = day_list.loc[day]
 
         focal_planes = []
-        for day_ in days:
-            day_index = day_list.loc[day_]
+        for day_index in day_list.values:
             ccdids = self.init_datafile.loc[day_index]["ccdid"].values
             ccds = [ztfimg.CCD.from_data(self.daily_ccds[i]) for i in day_index]
             focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdids)
             focal_planes.append(focal_plane)
-
-        if as_dict:
-            return dict(zip(days, focal_planes) )
         
         return focal_planes
         
@@ -178,7 +159,11 @@ class CalibPipe( BasePipe ):
     # ----------------- #
     def get_init_datafile(self):
         """ """
-        return self.datafile.groupby(["day","ccdid"])["filepath"].apply(list).reset_index()
+        groupby_ = ["day","ccdid"]
+        if self.pipekind == "flat":
+            groupby_ += ["ledid"]
+            
+        return self.datafile.groupby(groupby_)["filepath"].apply(list).reset_index()
 
     def load_metadata(self, period=None, **kwargs):
         """ """

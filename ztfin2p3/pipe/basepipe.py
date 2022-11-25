@@ -129,7 +129,7 @@ class CalibPipe( BasePipe ):
         """ """
         ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
         if ccdid is not None:
-            ccdid_list = ccdid_list.loc[ccdid]
+            ccdid_list = ccdid_list.loc[np.atleast_1d(ccdid)]
         
         arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
                     for list_id in ccdid_list.values]
@@ -142,7 +142,7 @@ class CalibPipe( BasePipe ):
 
         
         if day is not None:
-            day_list = day_list.loc[day]
+            day_list = day_list.loc[np.atleast_1d(day)]
 
         focal_planes = []
         for day_index in day_list.values:

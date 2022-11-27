@@ -111,7 +111,7 @@ class CalibPipe( BasePipe ):
         """ """
         # list of stacked CCD array Nx6000x6000
         ccdids, stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, **kwargs)
-        ccds = [ztfimg.CCD.from_data( getattr(da,mergestats)(stacked_ccd_, axis=0) )
+        ccds = [ztfimg.CCD.from_data( getattr(da, mergestats)(stacked_ccd_, axis=0) )
                     for stacked_ccd_ in stacked_ccds]
         
         return ccdids, ccds
@@ -127,33 +127,78 @@ class CalibPipe( BasePipe ):
     # ----------------- #        
     def get_stacked_ccdarray(self, ccdid=None):
         """ """
-        ccdid_list = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
+        datalist = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
+        
         if ccdid is not None:
-            ccdid_list = ccdid_list.loc[np.atleast_1d(ccdid)]
+            datalist = datalist.loc[np.atleast_1d(ccdid)]
         
-        arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
-                    for list_id in ccdid_list.values]
+        darray_ = self._ccddata_from_datalist_(datalist)
         
-        return ccdid_list.index.values, arrays_
+        return datalist.index.values, darray_
 
+
+    def get_daily_ccd(self, day=None, ccdid=None):
+        """ """
+        datalist = self.init_datafile.copy()
+        if day is not None:
+            day = np.atleast_1d(day)
+            datalist = datalist[datalist["day"].isin(day)]
+
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        # to keep the same format as the other get_functions:
+        datalist = datalist.reset_index().set_index(["day","ccdid"])["index"]
+
+        ccds = [ztfimg.CCD.from_data(self.daily_ccds[i])
+                     for i in datalist.values]
+
+        return pandas.Series(data=ccds, dtype="object",
+                          index=datalist.index)
+        
     def get_daily_focalplane(self, day=None):
         """ """
-        day_list = self.init_datafile.reset_index().groupby("day")["index"].apply(list)
+        ccds_df = self.get_daily_ccd(day)
+        days = ccds_df.index.levels[0]
+        ccdids = np.arange(1,17)
+        # the follows crashes (in purpose) if there are missing ccds
+        fps = [ccds_df.loc[day, ccdids].values
+                  for day in days]
+        return fps
+        
+        
+    # ----------------- #
+    #  Internal         #
+    # ----------------- #        
+    def _ccddata_from_datalist_(self, datalist, merged=None):
+        """ loops over datalist rows to get the daily_ccds 
 
-        
-        if day is not None:
-            day_list = day_list.loc[np.atleast_1d(day)]
+        Parameters
+        ----------
+        datalist: pandas.Series
+            serie containing list of indexes.
 
-        focal_planes = []
-        for day_index in day_list.values:
-            ccdids = self.init_datafile.loc[day_index]["ccdid"].values
-            ccds = [ztfimg.CCD.from_data(self.daily_ccds[i]) for i in day_index]
-            focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdids)
-            focal_planes.append(focal_plane)
+        merged: None, str
+            if merged is not None, it is assumed to be 
+            a dask.array function used to merge the data.
+            e.g. 'mean', 'median', 'std' etc.
+
+        Returns
+        -------
+        list
+            list of dask.array
+        """
+        arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
+                    for list_id in datalist.values]
+
+        if merged is not None:
+            arrays_ = [getattr(da, merged)(a_, axis=0)
+                            for a_ in arrays_]
         
-        return focal_planes
-        
-        
+        return arrays_        
+
+    
     # ----------------- #
     #   Structural      #
     # ----------------- #

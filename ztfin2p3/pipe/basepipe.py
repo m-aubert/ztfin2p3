@@ -1,7 +1,7 @@
 from ..builder import CalibrationBuilder
 from .. import io
 
-
+import pandas
 import numpy as np
 import dask.array as da
 

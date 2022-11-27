@@ -163,8 +163,10 @@ class CalibPipe( BasePipe ):
         days = ccds_df.index.levels[0]
         ccdids = np.arange(1,17)
         # the follows crashes (in purpose) if there are missing ccds
-        fps = [ccds_df.loc[day, ccdids].values
-                  for day in days]
+        fps = [ ztfimg.FocalPlane( ccds=ccds_df.loc[day, ccdids].values,
+                                   ccdids=ccdids)
+               for day in days]
+            
         return fps
         
         

@@ -110,35 +110,44 @@ class CalibPipe( BasePipe ):
     def get_ccd(self, ccdid=None, mergestats="mean", **kwargs):
         """ """
         # list of stacked CCD array Nx6000x6000
-        ccdids, stacked_ccds = self.get_stacked_ccdarray(ccdid=ccdid, **kwargs)
-        ccds = [ztfimg.CCD.from_data( getattr(da, mergestats)(stacked_ccd_, axis=0) )
-                    for stacked_ccd_ in stacked_ccds]
+        ccddata = self.get_ccddata(ccdid=ccdid, merged=mergestats,)
+        ccds = [ztfimg.CCD.from_data(ccddata_) for ccddata_ in ccddata.values]
         
-        return ccdids, ccds
+        return pandas.Series(data=ccds, dtype="object", index=ccddata.index)
 
     def get_focalplane(self, mergestats="mean"):
         """ """
-        ccdids, ccds = self.get_ccd()
-        focal_plane = ztfimg.FocalPlane(ccds=ccds, ccdids=ccdid)
+        ccds = self.get_ccd()
+        focal_plane = ztfimg.FocalPlane(ccds=ccds.values, ccdids=ccdids.index)
         return focal_plane
     
     # ----------------- #
     #  Mid-Level build  #
     # ----------------- #        
-    def get_stacked_ccdarray(self, ccdid=None):
+    def get_ccddata(self, ccdid=None, merged=None):
         """ """
         datalist = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
         
         if ccdid is not None:
             datalist = datalist.loc[np.atleast_1d(ccdid)]
         
-        darray_ = self._ccddata_from_datalist_(datalist)
-        
-        return datalist.index.values, darray_
-
+        return self._ccddata_from_datalist_(datalist, merged=merged)
 
     def get_daily_ccd(self, day=None, ccdid=None):
-        """ """
+        """ get the ztfimg.CCD object(s) for the given day(s) and ccd(s)
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        pandas.Serie
+            MultiIndex (day, ccdid) of the corresponding ztfimg.CCD
+
+        See also
+        --------
+        get_daily_focalplane: get the full ztf.img.FocalPlane for the given day(s)
+        """
         datalist = self.init_datafile.copy()
         if day is not None:
             day = np.atleast_1d(day)
@@ -167,7 +176,7 @@ class CalibPipe( BasePipe ):
                                    ccdids=ccdids)
                for day in days]
             
-        return fps
+        return pandas.Series(data=fps, dtype="object", index=days)
         
         
     # ----------------- #
@@ -198,7 +207,7 @@ class CalibPipe( BasePipe ):
             arrays_ = [getattr(da, merged)(a_, axis=0)
                             for a_ in arrays_]
         
-        return arrays_        
+        return pandas.Series(data=arrays_, index=datalist.index)
 
     
     # ----------------- #

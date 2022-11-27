@@ -207,7 +207,7 @@ class CalibPipe( BasePipe ):
             arrays_ = [getattr(da, merged)(a_, axis=0)
                             for a_ in arrays_]
         
-        return pandas.Series(data=arrays_, index=datalist.index)
+        return pandas.Series(data=arrays_, dtype="object", index=datalist.index)
 
     
     # ----------------- #

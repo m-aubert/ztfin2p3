@@ -311,22 +311,64 @@ class CalibPipe( BasePipe ):
         datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
         self.set_datafile(datafile) 
         
-    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None):
-        """ """
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None,
+                         use_dask=None):
+        """ loads the daily CalibrationBuilder based on init_datafile.
 
-        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction)
+        Parameters
+        ----------
+        corr_overscan: bool
+            Should the data be corrected for overscan
+            (if both corr_overscan and corr_nl are true, 
+            nl is applied first)
+
+        corr_nl: bool
+            Should data be corrected for non-linearity
+
+        chunkreduction: int or None
+            rechunk and split of the image.
+            If None, no rechunk
+
+        use_dask: bool or None
+            should dask be used ? (faster if there is a client open)
+            if None, this will guess if a client is available.
+
+        Returns
+        -------
+        None
+            sets self.daily_ccds
+        """
+        if use_dask is None:
+            from dask import distributed
+            try:
+                _ = distributed.get_client()
+                use_dask = True
+            except:
+                use_dask = False
+                print("no dask")
+        # function 
+        calib_from_filename = CalibrationBuilder.from_filenames
+        if use_dask:
+            import dask
+            calib_from_filename = dask.delayed(calib_from_filename)
+
+        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
+                    chunkreduction=chunkreduction)
 
         data_outs = []
         for i_, s_ in self.init_datafile.iterrows():
             filesin = s_["filepath"]
-            fbuilder = CalibrationBuilder.from_filenames(filesin,
-                                                         raw=True,
-                                                         as_path=True,
-                                                         persist=False)
-            data, _ = fbuilder.build(**prop)
+            fbuilder = calib_from_filename(filesin,
+                                           raw=True, as_path=True,
+                                           persist=False)
+            data = fbuilder.build(**prop)[0]
             data_outs.append(data)
 
+        if use_dask:
+            data_outs = dask.delayed(list)(data_outs).compute()
+
         self._daily_ccds = data_outs
+
     
 
     # ============== #

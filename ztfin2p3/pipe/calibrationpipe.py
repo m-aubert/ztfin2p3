@@ -226,7 +226,7 @@ class FlatPipe( CalibPipe ):
         return self._ccds_df_to_focalplane_df_(ccds_df)
 
     @staticmethod
-    def _ccds_df_to_focalplane_df_(ccd_df):
+    def _ccds_df_to_focalplane_df_(ccds_df):
         """ """
         
         ccds_df.name = "ccd" # cleaner for the df that comes next.

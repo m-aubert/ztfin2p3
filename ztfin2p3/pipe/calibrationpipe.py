@@ -2,6 +2,12 @@
 from .basepipe import CalibPipe
 from ..builder import CalibrationBuilder
 from .. import io
+
+import pandas
+import numpy as np
+
+import ztfimg
+
 # BasePipe has
 #     - config and co.
 #     - datafile and co.

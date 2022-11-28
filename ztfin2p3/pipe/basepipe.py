@@ -62,6 +62,8 @@ class CalibPipe( BasePipe ):
     def from_period(cls, start, end, use_dask=True, **kwargs):
         """ 
         
+        Parameters
+        ----------
         start, end: 
             the period concerned by this flat. 
             format: yyyy-mm-dd
@@ -76,8 +78,7 @@ class CalibPipe( BasePipe ):
     #   Methods      #
     # ============== #
     def get_fileout(self, ccdid, **kwargs):
-        """ get the file to be written to store the period ccd product
-        (see get_ccd)
+        """ get the filepath where the ccd data should be stored
 
         Parameters
         ----------
@@ -97,6 +98,7 @@ class CalibPipe( BasePipe ):
         """
         if self.pipekind == "bias":
             fileout = io.get_period_biasfile(*self.period, ccdid=ccdid)
+            
         elif self.pipkind == "flat":
             fileout = io.get_period_flatfile(*self.period, ccdid=ccdid, **kwargs)
         else:
@@ -107,37 +109,100 @@ class CalibPipe( BasePipe ):
     # ----------------- #
     #  High-Level build #
     # ----------------- #
-    def get_ccd(self, ccdid=None, mergestats="mean", **kwargs):
-        """ """
-        # list of stacked CCD array Nx6000x6000
-        ccddata = self.get_ccddata(ccdid=ccdid, merged=mergestats,)
-        ccds = [ztfimg.CCD.from_data(ccddata_) for ccddata_ in ccddata.values]
+    def get_ccd(self, ccdid=None, mergedhow="mean", **kwargs):
+        """ get a list of ztfimg.CCD object for each requested ccdid.
+        These will merge all daily_ccds corresponding to this ccdid.
         
-        return pandas.Series(data=ccds, dtype="object", index=ccddata.index)
+        Parameters
+        ----------
+        ccdid: int (or list of)
+            id(s) of the ccd. (1->16). 
+            If None all 16 will be assumed.
 
-    def get_focalplane(self, mergestats="mean"):
-        """ """
-        ccds = self.get_ccd()
+        mergedhow: str
+           name of the dask.array method used to merge the daily
+           ccd data (e.g. 'mean', 'median', 'std' etc.) 
+
+        Returns
+        -------
+        pandas.Series
+            indexe as ccdid and values as ztfimg.CCD objects
+
+        See also
+        --------
+        get_focalplane: get the full merged focalplane object
+        """
+        # list of stacked CCD array Nx6000x6000
+        indexes, ccddata = self.get_ccdarray(ccdid=ccdid, merged=mergedhow, **kwargs)
+        ccds = [ztfimg.CCD.from_data(ccddata_) for ccddata_ in ccddata]
+        return pandas.Series(data=ccds, dtype="object", index=indexes)
+
+    def get_focalplane(self, mergedhow="mean"):
+        """ get the fully merged focalplane.
+        It combines all 16 CCDs from get_ccd()
+
+        Parameters
+        ----------
+        mergedhow: str
+           name of the dask.array method used to merge the daily
+           ccd data (e.g. 'mean', 'median', 'std' etc.) 
+
+        Returns
+        -------
+        ztfimg.FocalPlane
+            the full merged focalplane.
+        """
+        ccds = self.get_ccd(mergedhow=mergedhow)
         focal_plane = ztfimg.FocalPlane(ccds=ccds.values, ccdids=ccdids.index)
         return focal_plane
     
     # ----------------- #
     #  Mid-Level build  #
     # ----------------- #        
-    def get_ccddata(self, ccdid=None, merged=None):
-        """ """
+    def get_ccdarray(self, ccdid=None, mergedhow=None):
+        """ get the dask.array for the given ccdids.
+        The data are either 2d or 3d if merged is given.
+
+        Parameters
+        ----------
+        ccdid: int (or list of)
+            id(s) of the ccd. (1->16). 
+            If None all 16 will be assumed.
+
+        mergedhow: str
+           name of the dask.array method used to merge the daily
+           ccd data (e.g. 'mean', 'median', 'std' etc.) 
+
+        Returns
+        -------
+        list
+            list of dask array (one per given ccdid).
+
+        See also
+        --------
+        get_ccd: get a this of ztfimg.CCD (uses get_ccdarray)
+        get_daily_ccd: get the ztfimg.CCD of a given day.
+        """
         datalist = self.init_datafile.reset_index().groupby("ccdid")["index"].apply(list)
         
         if ccdid is not None:
             datalist = datalist.loc[np.atleast_1d(ccdid)]
-        
-        return self._ccddata_from_datalist_(datalist, merged=merged)
+
+        array_ = self._ccdarray_from_datalist_(datalist, mergedhow=mergedhow)
+        return datalist.index.values, array_
 
     def get_daily_ccd(self, day=None, ccdid=None):
         """ get the ztfimg.CCD object(s) for the given day(s) and ccd(s)
 
         Parameters
         ----------
+        day: str (or list of)
+            day (format YYYYMMDD).
+            If None, all known days from init_datafile will be assumed.
+
+        ccdid: int (or list of)
+            id(s) of the ccd. (1->16). 
+            If None all 16 will be assumed.
 
         Returns
         -------
@@ -167,8 +232,25 @@ class CalibPipe( BasePipe ):
                           index=datalist.index)
         
     def get_daily_focalplane(self, day=None):
-        """ """
-        ccds_df = self.get_daily_ccd(day)
+        """ get the ztfimg.FocalPlane object gathering ccds
+        for the given date.
+
+        Parameters
+        ----------
+        day: str (or list of)
+            day (format YYYYMMDD).
+            If None, all known days from init_datafile will be assumed.
+
+        Returns
+        -------
+        pandas.Serie
+            indexes are day, value are the ztfimg.FocalPlane objects.
+
+        See also
+        --------
+        get_daily_ccd: gets the ccd object for the given date. (used by get_daily_focalplane)
+        """
+        ccds_df = self.get_daily_ccd(day=day)
         days = ccds_df.index.levels[0]
         ccdids = np.arange(1,17)
         # the follows crashes (in purpose) if there are missing ccds
@@ -182,7 +264,7 @@ class CalibPipe( BasePipe ):
     # ----------------- #
     #  Internal         #
     # ----------------- #        
-    def _ccddata_from_datalist_(self, datalist, merged=None):
+    def _ccdarray_from_datalist_(self, datalist, mergedhow=None):
         """ loops over datalist rows to get the daily_ccds 
 
         Parameters
@@ -203,11 +285,11 @@ class CalibPipe( BasePipe ):
         arrays_ = [da.stack([self.daily_ccds[i] for i in list_id]) 
                     for list_id in datalist.values]
 
-        if merged is not None:
-            arrays_ = [getattr(da, merged)(a_, axis=0)
+        if mergedhow is not None:
+            arrays_ = [getattr(da, mergedhow)(a_, axis=0)
                             for a_ in arrays_]
-        
-        return pandas.Series(data=arrays_, dtype="object", index=datalist.index)
+        # do not set this in pandas.Series as it compiles it. (must call np.asarray somewhere)
+        return arrays_
 
     
     # ----------------- #

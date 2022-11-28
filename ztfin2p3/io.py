@@ -251,6 +251,8 @@ def get_period_flatfile(start, end, ccdid, filtername=None, ledid=None):
 
     ledid: int or None
        = must be given if filtername is None =
+       id of the LED. 
+
     Returns
     -------
     str

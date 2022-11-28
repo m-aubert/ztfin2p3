@@ -86,7 +86,7 @@ class FlatPipe( CalibPipe ):
         """
         return super().get_ccd(ccdid=ccdid, ledid=ledid, mergedhow=mergedhow)
 
-    def get_focalplane(self, ledid=None, mergedhow="mean"):
+    def get_focalplane(self, ledid=None, mergedhow="mean", **kwargs):
         """ get the fully merged focalplane.
         It combines all 16 CCDs from get_ccd()
 
@@ -106,7 +106,7 @@ class FlatPipe( CalibPipe ):
             the full merged focalplane.
         """
         ccds_df = self.get_ccd(mergedhow=mergedhow, ledid=ledid)
-        return self._ccds_df_to_focalplane_df_(ccds_df)
+        return self._ccds_df_to_focalplane_df_(ccds_df, **kwargs)
 
     # ----------------- #
     #  Mid-Level build  #
@@ -223,10 +223,10 @@ class FlatPipe( CalibPipe ):
         get_daily_ccd: gets the ccd object for the given date. (used by get_daily_focalplane)
         """
         ccds_df = self.get_daily_ccd(day=day, ledid=ledid)
-        return self._ccds_df_to_focalplane_df_(ccds_df)
+        return self._ccds_df_to_focalplane_df_(ccds_df, **kwargs)
 
     @staticmethod
-    def _ccds_df_to_focalplane_df_(ccds_df):
+    def _ccds_df_to_focalplane_df_(ccds_df, **kwargs):
         """ """
         
         ccds_df.name = "ccd" # cleaner for the df that comes next.

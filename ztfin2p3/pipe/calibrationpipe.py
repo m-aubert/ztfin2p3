@@ -105,7 +105,7 @@ class FlatPipe( CalibPipe ):
         ztfimg.FocalPlane
             the full merged focalplane.
         """
-        ccds = self.get_ccd(mergedhow=mergedhow, ledid=ledid)
+        ccds_df = self.get_ccd(mergedhow=mergedhow, ledid=ledid)
         return self._ccds_df_to_focalplane_df_(ccds_df)
 
     # ----------------- #

@@ -105,10 +105,8 @@ class FlatPipe( CalibPipe ):
         ztfimg.FocalPlane
             the full merged focalplane.
         """
-        ccds = self.get_ccd(mergedhow=mergedhow)
-        raise NotImplementedError("not ready.")
-        focal_plane = ztfimg.FocalPlane(ccds=ccds.values, ccdids=ccdids.index)
-        return focal_plane
+        ccds = self.get_ccd(mergedhow=mergedhow, ledid=ledid)
+        return self._ccds_df_to_focalplane_df_(ccds_df)
 
     # ----------------- #
     #  Mid-Level build  #
@@ -203,7 +201,7 @@ class FlatPipe( CalibPipe ):
         return pandas.Series(data=ccds, dtype="object",
                           index=datalist.index)
 
-    def get_daily_focalplane(self, day=None, ledid=None):
+    def get_daily_focalplane(self, day=None, ledid=None, **kwargs):
         """ get the ztfimg.FocalPlane object gathering ccds
         for the given date.
 
@@ -213,28 +211,40 @@ class FlatPipe( CalibPipe ):
             day (format YYYYMMDD).
             If None, all known days from init_datafile will be assumed.
 
+        **kwargs goes to ztfimg.FocalPlane()
+
         Returns
         -------
         pandas.Serie
-            indexes are day, value are the ztfimg.FocalPlane objects.
+            MultiIndex are day, value are the ztfimg.FocalPlane objects.
 
         See also
         --------
         get_daily_ccd: gets the ccd object for the given date. (used by get_daily_focalplane)
         """
         ccds_df = self.get_daily_ccd(day=day, ledid=ledid)
-        days = ccds_df.index.levels[0]
-        ledids = ccds_df.index.levels[2]
-        ccdids = np.arange(1,17)
-        print("TO BE DOUBLE CHECKED")
+        return self._ccds_df_to_focalplane_df_(ccds_df)
+
+    @staticmethod
+    def _ccds_df_to_focalplane_df_(ccd_df):
+        """ """
         
+        ccds_df.name = "ccd" # cleaner for the df that comes next.
+        ccds_df = ccds_df.reset_index(level=1)
+        _grouped = ccds_df.groupby(level=[0,1])
+        # convert to list of.
+        # Remark that pandas does not handle groupby()[["k1","k2"]].apply(list). This
+        # explain why there are two lists that I then join.
+        # This is useful to make sure all 16 ccdids are there and their
+        # ordering inside the dataframe. Maybe overkill but sure it is clean.
+        ccds = _grouped["ccd"].apply(list).to_frame()
+        ccdids = _grouped["ccdid"].apply(list).to_frame()
+        ccds_df = ccds.join(ccdids)
+
         # the follows crashes (in purpose) if there are missing ccds
-        indexes = [(day, ledid) for ledid in ledids for day in days]
-        fps = [ ztfimg.FocalPlane( ccds=ccds_df.loc[index_[0], ccdids, index_[1]].values,
-                                   ccdids=ccdids)
-               for index_ in indexes]
-        
-        return pandas.Series(data=fps, dtype="object", index=indexes)
+        return ccds_df.apply(lambda x: ztfimg.FocalPlane( ccds=x["ccd"],
+                                                        ccdids=x["ccdid"], **kwargs), 
+                                 axis=1)
     
     
 class BiasPipe( CalibPipe ):

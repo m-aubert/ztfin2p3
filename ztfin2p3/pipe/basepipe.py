@@ -133,7 +133,7 @@ class CalibPipe( BasePipe ):
         get_focalplane: get the full merged focalplane object
         """
         # list of stacked CCD array Nx6000x6000
-        indexes, ccddata = self.get_ccdarray(ccdid=ccdid, merged=mergedhow, **kwargs)
+        indexes, ccddata = self.get_ccdarray(ccdid=ccdid, mergedhow=mergedhow, **kwargs)
         ccds = [ztfimg.CCD.from_data(ccddata_) for ccddata_ in ccddata]
         return pandas.Series(data=ccds, dtype="object", index=indexes)
 

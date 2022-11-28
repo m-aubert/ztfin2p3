@@ -136,7 +136,7 @@ class FlatPipe( CalibPipe ):
         get_daily_ccd: get the ztfimg.CCD of a given day.
 
         """
-        datalist = self.init_datafile.reset_index().groupby(["ccdid","ledid")["index"].apply(list)
+        datalist = self.init_datafile.reset_index().groupby(["ccdid","ledid"])["index"].apply(list)
         
         if ccdid is not None: # ledid is level 0
             datalist = datalist.loc[np.atleast_1d(ccdid)]

@@ -230,6 +230,11 @@ class CalibPipe( BasePipe ):
 
         return pandas.Series(data=ccds, dtype="object",
                           index=datalist.index)
+    
+    
+    def get_daily_imgcollection(self, ccdid=None):
+        return self.get_daily_ccd(ccdid).groupby('ccdid').apply(list)
+    
         
     def get_daily_focalplane(self, day=None):
         """ get the ztfimg.FocalPlane object gathering ccds
@@ -443,27 +448,17 @@ class CalibPipe( BasePipe ):
         prop = {dict(use_dask=use_dask), **kwargs}
                    
         data_outs = []
-        for i in range(16) : 
-            fbuilder = calib_from_filename(self.get_daily_imgcollection(ccdid=i))
+        for i in range(1,17) : 
+            fbuilder = calib_from_filename(self.get_daily_imgcollection(ccdid=i).values)
             fileout = fbuilder.build_and_store(**prop)
             data_outs.append(fbuilder.data)
 
-        #if use_dask:
-        #    data_outs = dask.delayed(list)(data_outs).compute()
+        if use_dask:
+            data_outs = dask.delayed(list)(data_outs).compute()
 
-        return data_outs #self._daily_ccds = data_out    
-               
-    def create_daily_imgcollection(self):
-        """
-        Transform daily ccds to nested list of imgcollection to pass to CalibrationBuilder.
-        """    
-        self._daily_imgcollection = [[ztfimg.RawCCD.from_data(data) for data in self.daily_ccds[i::16]] for i in range(16)]
-        
-    def get_daily_imgcollection(self, ccdid):
-        if not hasattr("_daily_imgcollection"):
-            self.create_daily_imgcollection()
-        return self._daily_imgcollection[ccdid]
-        
+        self._period_ccds = data_outs
+    
+    
     # ============== #
     #  Property      #
     # ============== #
@@ -482,15 +477,6 @@ class CalibPipe( BasePipe ):
             raise AttributeError("_daily_ccds not available. run 'build_daily_ccds' ")
         
         return self._daily_ccds
-    
-    
-    @property
-    def daily_imgcollection(self):
-        """ """
-        if not hasattr(self, "_daily_imgcollection"):
-            raise AttributeError("_daily_imgcollection not available. run 'create_daily_imgcollection' ")
-        
-        return self._daily_imgcollection
    
     @property
     def init_datafile(self):
@@ -500,4 +486,11 @@ class CalibPipe( BasePipe ):
             
         return self._init_datafile
 
+    @property
+    def period_ccds(self):
+        """ """
+        if not hasattr(self,"_period_ccds") : 
+            raise AttributeError("_period_ccds not available. run 'build_period_ccds' ")
+            
+        return self._period_ccds
         

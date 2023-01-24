@@ -312,7 +312,7 @@ class CalibPipe( BasePipe ):
         self.set_datafile(datafile) 
         
     def build_daily_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None,
-                         use_dask=None):
+                         use_dask=None, **kwargs):
         """ loads the daily CalibrationBuilder based on init_datafile.
 
         Parameters
@@ -332,6 +332,10 @@ class CalibPipe( BasePipe ):
         use_dask: bool or None
             should dask be used ? (faster if there is a client open)
             if None, this will guess if a client is available.
+            
+        **kwargs
+            Instruction to average the data
+            The keyword arguments are passed to ztfimg.collection.ImageCollection.get_meandata() 
 
         Returns
         -------
@@ -352,8 +356,10 @@ class CalibPipe( BasePipe ):
             import dask
             calib_from_filename = dask.delayed(calib_from_filename)
 
-        prop = dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
-                    chunkreduction=chunkreduction)
+        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
+                    chunkreduction=chunkreduction), 
+                **kwargs}
+               
 
         data_outs = []
         for i_, s_ in self.init_datafile.iterrows():

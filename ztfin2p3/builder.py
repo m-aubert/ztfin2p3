@@ -86,6 +86,20 @@ class CalibrationBuilder( object ): # /day /week /month
                                                       persist=persist, as_path=as_path, **kwargs)
         return cls(flatcollection)
 
+    @classmethod
+    def from_images(cls, images, raw=True, **kwargs)
+        """
+        Definition to work on. 
+        CcdCollection.from_images has a strong tendency to fail kernels (for unknown reason)
+        """
+        if raw:
+            CcdCollection = collection.RawCCDCollection
+        else:
+            CcdCollection = collection.CCDCollection
+        
+        flatcollection = CcdCollection.from_images(images)
+        
+        return cls(flatcollection)     
     
     def to_fits(self, fileout, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format 

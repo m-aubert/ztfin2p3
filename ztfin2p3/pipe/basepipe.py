@@ -375,8 +375,95 @@ class CalibPipe( BasePipe ):
 
         self._daily_ccds = data_outs
 
-    
+        
+    def build_period_ccds(self, corr_overscan=True, corr_nl=True, chunkreduction=None,
+                         use_dask=None, write=False, **kwargs):
+        """ loads the period CalibrationBuilder based on init_datafile.
 
+        Parameters
+        ----------
+        corr_overscan: bool
+            Should the data be corrected for overscan
+            (if both corr_overscan and corr_nl are true, 
+            nl is applied first)
+
+        corr_nl: bool
+            Should data be corrected for non-linearity
+
+        chunkreduction: int or None
+            rechunk and split of the image.
+            If None, no rechunk
+
+        use_dask: bool or None
+            should dask be used ? (faster if there is a client open)
+            if None, this will guess if a client is available.
+            
+        store : bool 
+            Whether the created period ccds should be written to disk.
+            
+        store_dict : dict 
+            Additionnal keywords to pass to the CalibrationBuild.build_and_store() function.
+            Necessary if store is set to True
+        
+        **kwargs
+            Instruction to average the data
+            The keyword arguments are passed to ztfimg.collection.ImageCollection.get_meandata() 
+
+        Returns
+        -------
+        period_ccds 
+            
+            Also saves period_ccds to file if asked.
+        """
+        
+        #Ensure self.daily_ccds is set with asked corrections
+        self.build_daily_ccds(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction,
+                         use_dask=use_dask, **kwargs)
+        
+        if use_dask is None:
+            from dask import distributed
+            try:
+                _ = distributed.get_client()
+                use_dask = True
+            except:
+                use_dask = False
+                print("no dask")
+                
+        # function 
+        calib_from_filename = CalibrationBuilder.from_images
+        #Need to create a from image.
+        if use_dask:
+            import dask
+            calib_from_filename = dask.delayed(calib_from_filename) 
+            #Unknown if class can be delayed.
+            #Would seem weird to do. 
+            
+        #No reloading of corrections if have already been applied. 
+        # Inverse case should be discussed.
+        prop = {dict(use_dask=use_dask), **kwargs}
+                   
+        data_outs = []
+        for i in range(16) : 
+            fbuilder = calib_from_filename(self.get_daily_imgcollection(ccdid=i))
+            fileout = fbuilder.build_and_store(**prop)
+            data_outs.append(fbuilder.data)
+
+        #if use_dask:
+        #    data_outs = dask.delayed(list)(data_outs).compute()
+
+        return data_outs #self._daily_ccds = data_out    
+               
+    def create_daily_imgcollection(self):
+        """
+        Transform daily ccds to nested list of imgcollection to pass to CalibrationBuilder.
+        """    
+        self._daily_imgcollection = [[ztfimg.RawCCD.from_data(data) for data in self.daily_ccds[i::16]] for i in range(16)]
+        
+    def get_daily_imgcollection(self, ccdid):
+        if not hasattr("_daily_imgcollection"):
+            self.create_daily_imgcollection()
+        return self._daily_imgcollection[ccdid]
+        
     # ============== #
     #  Property      #
     # ============== #
@@ -395,7 +482,16 @@ class CalibPipe( BasePipe ):
             raise AttributeError("_daily_ccds not available. run 'build_daily_ccds' ")
         
         return self._daily_ccds
+    
+    
+    @property
+    def daily_imgcollection(self):
+        """ """
+        if not hasattr(self, "_daily_imgcollection"):
+            raise AttributeError("_daily_imgcollection not available. run 'create_daily_imgcollection' ")
         
+        return self._daily_imgcollection
+   
     @property
     def init_datafile(self):
         """ """
@@ -403,3 +499,5 @@ class CalibPipe( BasePipe ):
             self._init_datafile = self.get_init_datafile()
             
         return self._init_datafile
+
+        

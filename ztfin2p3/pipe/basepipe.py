@@ -137,7 +137,7 @@ class CalibPipe( BasePipe ):
         else : 
             ids = np.atleast_1d(ccdid)
          
-        ccds = [ztfimg.CCD.from_filenames(self.get_fileout(ccdid=val) for val in ids]
+        ccds = [ztfimg.CCD.from_filenames(self.get_fileout(ccdid=val)) for val in ids]
         return pandas.Series(data=ccds, dtype="object", index=ids)
                   
     def get_ccd(self, ccdid=None, mergedhow="mean", **kwargs):

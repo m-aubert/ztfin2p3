@@ -139,7 +139,7 @@ class CalibPipe( BasePipe ):
          
         ccds = [ztfimg.CCD.from_filenames(self.get_fileout(ccdid=val) for val in ids]
         return pandas.Series(data=ccds, dtype="object", index=ids)
-                                                        
+                  
     def get_ccd(self, ccdid=None, mergedhow="mean", **kwargs):
         """ get a list of ztfimg.CCD object for each requested ccdid.
         These will merge all daily_ccds corresponding to this ccdid.

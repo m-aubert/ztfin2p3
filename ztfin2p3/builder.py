@@ -87,7 +87,7 @@ class CalibrationBuilder( object ): # /day /week /month
         return cls(flatcollection)
 
     @classmethod
-    def from_images(cls, images, raw=True, **kwargs)
+    def from_images(cls, images, raw=True, **kwargs):
         """
         Definition to work on. 
         CcdCollection.from_images has a strong tendency to fail kernels (for unknown reason)

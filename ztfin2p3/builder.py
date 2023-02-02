@@ -89,9 +89,8 @@ class CalibrationBuilder( object ): # /day /week /month
     @classmethod
     def from_images(cls, images, raw=True, **kwargs):
         """
-        Definition to work on. 
-        CcdCollection.from_images has a strong tendency to fail kernels (for unknown reason)
         """
+        from ztfimg import collection
         if raw:
             CcdCollection = collection.RawCCDCollection
         else:
@@ -293,8 +292,8 @@ class CalibrationBuilder( object ): # /day /week /month
         #data = data.persist() # needed to force the good graph
         
         if "dask" in str(type(data)): # is a dask object
-            import dask
-            to_fits = dask.delayed(self._to_fits)
+            data = data.compute()
+            to_fits = self.to_fits
         else:
             to_fits = self._to_fits
             

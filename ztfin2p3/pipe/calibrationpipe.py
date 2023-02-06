@@ -312,7 +312,7 @@ class FlatPipe( CalibPipe ):
                 ccd_list.append(ccd_per_led)
                 
         if overwrite_period:
-            setattr(self, "_"+apply_period_"ccds", ccd_list)
+            setattr(self, "_"+apply_period_+"ccds", ccd_list)
         
         return ccd_list
  

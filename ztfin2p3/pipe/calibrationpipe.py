@@ -246,6 +246,86 @@ class FlatPipe( CalibPipe ):
                                                         ccdids=x["ccdid"], **kwargs), 
                                  axis=1)
     
+    def get_period_ccd(self,from_file=False, rebuild=False, ccdid=None,ledid=None, filtername=None, **kwargs):
+        if from_file : 
+            ccds = self.get_period_ccd_fromfile(ccdid=ccdid, ledid=ledid, filtername=filtername) 
+            self._period_ccds = [ccds.loc[i].data for i in ccds.index]
+        else : 
+            if not hasattr(self, "_period_ccds") or rebuild : 
+                self.build_period_ccds(**kwargs)
+            
+        datalist = self.init_datafile.copy()
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        if ledid is not None:
+            ledid = np.atleast_1d(ledid)
+            datalist = datalist[datalist["ledid"].isin(ledid)]
+
+        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
+
+        ccds_im = [ztfimg.CCD.from_data(ccd_arr) for ccd_arr in self.period_ccds]
+        ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
+
+        return ccds
     
+    def get_period_ccd_fromfile(self, ccdid=None, ledid=None, use_dask=True):
+        datalist = self.init_datafile.copy()
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        if ledid is not None:
+            ledid = np.atleast_1d(ledid)
+            datalist = datalist[datalist["ledid"].isin(ledid)]
+
+        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
+                
+        ccds = [ztfimg.RawCCD.from_data(self._from_fits(self.get_fileout(ccdid=ccdval, ledid=ledval), use_dask=use_dask)) for ccdval, ledval in ids]
+        
+        outp = pandas.Series(data=ccds, dtype="object", index=ids)
+        return outp
+    
+    
+    def apply_master_bias(self, fromfile=None, ledid=None, apply_period="daily", overwrite_period =False, **kwargs):
+        """ WORK IN PROGRESS 
+        
+        Goal of this func is 
+        From period : load or compute master bias
+        Then, get each ccdid for each flat and correct for the master bias of the ccd. 
+        TBD : what of led. Should bias be corrected before or after each led is considered ?   
+        """
+        bias = BiasPipe.from_period(self.period)
+        
+        if fromfile : 
+            bias.get_ccd_fromfile(**kwargs)
+        else :
+            bias.build_daily_ccds(**kwargs)
+        
+        call_func = getattr(self, "get_"+apply_period+"_ccd")  
+               
+        ccd_list = []
+        for item, val in bias.get_period_ccds.iteritems():
+            for itemi , vali in call_func(ccdid=item, ledid=ledid):
+                ccd_per_led = ztfimg.CCD.from_data(vali - val.data)
+                ccd_list.append(ccd_per_led)
+                
+        if overwrite_period:
+            setattr(self, "_"+apply_period_"ccds", ccd_list)
+        
+        return ccd_list
+ 
+
+    def build_period_ccds(self,corr_overscan=False, corr_nl=False, chunkreduction=None,
+                         use_dask=None, _groupbyk=["ccdid", "ledid"], **kwargs):
+        
+        super().build_period_ccds(corr_overscan=False, corr_nl=False, chunkreduction=None,
+                         use_dask=None, _groupbyk=["ccdid", "ledid"], **kwargs)
+        
+                        
 class BiasPipe( CalibPipe ):
     _KIND = "bias"
+    
+    
+            

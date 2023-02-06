@@ -101,7 +101,7 @@ class CalibPipe( BasePipe ):
         if self.pipekind == "bias":
             fileout = io.get_period_biasfile(*self.period, ccdid=ccdid)
             
-        elif self.pipkind == "flat":
+        elif self.pipekind == "flat":
             fileout = io.get_period_flatfile(*self.period, ccdid=ccdid, **kwargs)
         else:
             raise NotImplementedError(f"only bias and flat kinds implemented ; this is {self.pipekind}")
@@ -139,13 +139,14 @@ class CalibPipe( BasePipe ):
                 
         return outs
 
-    def get_period_ccd_fromfile(self, ccdid=None, use_dask=True):         
-        if not ccdid : 
-            ids = self.init_datafile.reset_index().groupby("ccdid").last().index.sort_values()
-        else : 
+    def get_period_ccd_fromfile(self, ccdid=None, use_dask=True):        
+        if ccdid is not None : 
             ids = np.sort(np.atleast_1d(ccdid).tolist())
+        else : 
+            datalist = self.init_datafile.copy()
+            ids = datalist.reset_index().groupby("ccdid").last().index.sort_values()
                     
-        ccds = [ ztfimg.RawCCD.from_data(self._from_fits(self.get_fileout(ccdid=val), use_dask=use_dask)) for val in ids]
+        ccds = [ztfimg.RawCCD.from_data(self._from_fits(self.get_fileout(ccdid=val), use_dask=use_dask)) for val in ids]
         
         outp = pandas.Series(data=ccds, dtype="object", index=ids)
         return outp
@@ -198,17 +199,24 @@ class CalibPipe( BasePipe ):
     # ----------------- #
     #  High-Level build #
     # ----------------- #        
-    def get_period_ccds(self,from_file=False, rebuild=False, **kwargs):
+    def get_period_ccd(self,from_file=False, rebuild=False, ccdid=None, **kwargs):
         if from_file : 
-            ccds = self.get_period_ccd_fromfile() 
+            ccds = self.get_period_ccd_fromfile(ccdid=ccdid) 
             self._period_ccds = [ccds.loc[i].data for i in ccds.index]
         else : 
             if not hasattr(self, "_period_ccds") or rebuild : 
                 self.build_period_ccds(**kwargs)
-            ids = self.init_datafile.reset_index().groupby("ccdid").last().index.sort_values()
-            ccds_im = [ ztfimg.CCD.from_data(ccd_arr) for ccd_arr in self.period_ccds ]
-            ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
-        
+                                
+        datalist = self.init_datafile.copy()
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
+
+        ccds_im = [ztfimg.CCD.from_data(ccd_arr) for ccd_arr in self.period_ccds]
+        ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
+
         return ccds
                   
     def get_ccd(self, ccdid=None, mergedhow="mean", **kwargs):
@@ -399,9 +407,9 @@ class CalibPipe( BasePipe ):
     # ----------------- #
     
     def build_period_ccds(self,corr_overscan=False, corr_nl=False, chunkreduction=None,
-                         use_dask=None, **kwargs):
+                         use_dask=None, _groupbyk="ccdid", **kwargs):
         
-        ccds_dailycol = self.get_daily_ccd().groupby("ccdid").apply(list)
+        ccds_dailycol = self.get_daily_ccd().groupby(_groupbyk).apply(list)
         
         calib_initialize = CalibrationBuilder.from_images
         if use_dask:
@@ -480,9 +488,9 @@ class CalibPipe( BasePipe ):
                 print("no dask")
         # function 
         calib_from_filename = CalibrationBuilder.from_filenames
-        if use_dask:
-            import dask
-            calib_from_filename = dask.delayed(calib_from_filename)
+        #if use_dask:
+        #    import dask
+        #    calib_from_filename = dask.delayed(calib_from_filename)
 
         prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
                     chunkreduction=chunkreduction), 
@@ -492,14 +500,14 @@ class CalibPipe( BasePipe ):
         data_outs = []
         for i_, s_ in self.init_datafile.iterrows():
             filesin = s_["filepath"]
-            fbuilder = calib_from_filename(filesin,
+            fbuilder = CalibrationBuilder.from_filenames(filesin,
                                            raw=True, as_path=True,
-                                           persist=False)
+                                           persist=False, use_dask=use_dask)
             data = fbuilder.build(**prop)[0]
             data_outs.append(data)
 
-        if use_dask:
-            data_outs = dask.delayed(list)(data_outs).compute()
+        #if use_dask:
+        #    data_outs = dask.delayed(list)(data_outs).compute()
 
         self._daily_ccds = data_outs
         

@@ -108,6 +108,30 @@ class FlatPipe( CalibPipe ):
         ccds_df = self.get_ccd(mergedhow=mergedhow, ledid=ledid)
         return self._ccds_df_to_focalplane_df_(ccds_df, **kwargs)
 
+    
+    
+    def get_period_focalplane(self, ledid=None, **kwargs):
+        """ get the fully merged focalplane for the given period.
+        It combines all 16 CCDs from get_ccd()
+
+        Parameters
+        ----------
+        ledid: int (or list of)
+            id of the LED. 
+            If None, all known ledid from init_datafile with be assumed.
+
+        mergedhow: str
+           name of the dask.array method used to merge the daily
+           ccd data (e.g. 'mean', 'median', 'std' etc.) 
+
+        Returns
+        -------
+        ztfimg.FocalPlane
+            the full merged focalplane.
+        """
+        ccds_df = self.get_period_ccd(ledid=ledid,**kwargs)
+        return self._ccds_df_to_focalplane_df_(ccds_df, **kwargs)
+    
     # ----------------- #
     #  Mid-Level build  #
     # ----------------- #
@@ -288,42 +312,247 @@ class FlatPipe( CalibPipe ):
         return outp
     
     
-    def apply_master_bias(self, fromfile=None, ledid=None, apply_period="daily", overwrite_period =False, **kwargs):
-        """ WORK IN PROGRESS 
+    def _correct_master_bias(self, apply_period, from_file=False, ledid=None, **kwargs):
+        """ 
+        Function to apply master bias correction to designated period.
+        Should not be called directly
         
-        Goal of this func is 
-        From period : load or compute master bias
-        Then, get each ccdid for each flat and correct for the master bias of the ccd. 
-        TBD : what of led. Should bias be corrected before or after each led is considered ?   
+        Parameters 
+        ----------
+        apply_period : str 
+            Select the period to correct. Two options "daily" or "period". 
+            "daily" applies to each flat daily_ccds
+            "period" applied to each flat period_ccds. 
+        
+        from_file  : bool , default False
+            Set to True if the period master bias / CCD are to be loaded from a file.
+            Calls BiasPipe.get_fileout()
+        
+        ledid : int , default None
+            Select the ledid to apply the bias correction. 
+            If None, all LEDs will be considered.
+            
+        **kwargs 
+            Transmitted to BiasPipe.get_period_ccd
+            
+        Returns
+        -------
+        ccd_list : list
+            List of arrays. Dask array if use_dask in init , numpy otherwise.
         """
-        bias = BiasPipe.from_period(self.period)
         
-        if fromfile : 
-            bias.get_ccd_fromfile(**kwargs)
-        else :
-            bias.build_daily_ccds(**kwargs)
+        datalist = self.init_datafile.copy()
+        datalist["NFrames"] = datalist["filepath"].apply(len)
+        #datalist.groupby(["ccdid", "ledid"]).Nframes.apply(sum)
+        
+        if not apply_period in ["daily", "period"]:
+            raise ValueError()
+        
+        bias = BiasPipe.from_period(*self.period)
+        bias_ccds = bias.get_period_ccd(from_file=from_file, **kwargs)
         
         call_func = getattr(self, "get_"+apply_period+"_ccd")  
-               
+         
         ccd_list = []
-        for item, val in bias.get_period_ccds.iteritems():
-            for itemi , vali in call_func(ccdid=item, ledid=ledid):
-                ccd_per_led = ztfimg.CCD.from_data(vali - val.data)
+        for item, val in bias_ccds.iteritems():
+            for itemi , vali in call_func(ccdid=item, ledid=ledid).iteritems():
+                ccd_per_led = vali.data - val.data
                 ccd_list.append(ccd_per_led)
                 
-        if overwrite_period:
-            setattr(self, "_"+apply_period_+"ccds", ccd_list)
-        
         return ccd_list
  
 
-    def build_period_ccds(self,corr_overscan=False, corr_nl=False, chunkreduction=None,
-                         use_dask=None, _groupbyk=["ccdid", "ledid"], **kwargs):
+    def build_period_ccds(self,corr_overscan=True, corr_nl=True, corr_bias=False, chunkreduction=2, use_dask=None, _groupbyk=["ccdid", "ledid"], normalize=False, bias_opt={}, **kwargs):
         
-        super().build_period_ccds(corr_overscan=False, corr_nl=False, chunkreduction=None,
-                         use_dask=None, _groupbyk=["ccdid", "ledid"], **kwargs)
+        """ Overloading of the build_period_ccds
+        loads the period CalibrationBuilder based on the loaded daily_ccds.
+
+        Parameters
+        ----------
+        corr_overscan: bool
+            Should the data be corrected for overscan
+            (if both corr_overscan and corr_nl are true, 
+            nl is applied first)
+
+        corr_nl: bool
+            Should data be corrected for non-linearity
         
-                        
+        corr_bias : bool
+            Should data be corrected for master bias
+
+        chunkreduction: int or None
+            rechunk and split of the image.
+            If None, no rechunk
+
+        use_dask: bool or None
+            should dask be used ? (faster if there is a client open)
+            if None, this will guess if a client is available.
+            
+        normalize: bool, default False
+            If True, normalize each flat by the nanmedian level.
+        
+        bias_opt : dict 
+            Dictionnary to pass additionnal arguments to the master bias procedure.
+            
+        **kwargs
+            Instruction to average the data
+            The keyword arguments are passed to ztfimg.collection.ImageCollection.get_meandata() 
+
+        Returns
+        -------
+        None
+            sets self.period_ccds
+                
+        """
+        
+        super().build_period_ccds(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction, use_dask=use_dask, _groupbyk=_groupbyk, **kwargs)
+        
+        if corr_bias : 
+            ccd_list = self._correct_master_bias("period", **bias_opt)
+            setattr(self, "_period_ccds", ccd_list)
+            
+        if normalize : 
+            self._normalize(apply_period="period")
+            
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True, chunkreduction=None, use_dask=None, normalize=False,  bias_opt={}, **kwargs):
+        """ Overloading of the build_daily_ccds
+        loads the daily CalibrationBuilder based on init_datafile.
+
+        Parameters
+        ----------
+        corr_overscan: bool
+            Should the data be corrected for overscan
+            (if both corr_overscan and corr_nl are true, 
+            nl is applied first)
+
+        corr_nl: bool
+            Should data be corrected for non-linearity
+            
+        corr_bias : bool
+            Should data be corrected for master bias
+
+        chunkreduction: int or None
+            rechunk and split of the image.
+            If None, no rechunk
+
+        use_dask: bool or None
+            should dask be used ? (faster if there is a client open)
+            if None, this will guess if a client is available.
+            
+        normalize: bool, default False
+            If True, normalize each flat by the nanmedian level.
+        
+        bias_opt : dict 
+            Dictionnary to pass additionnal arguments to the master bias procedure.
+            
+        **kwargs
+            Instruction to average the data
+            The keyword arguments are passed to ztfimg.collection.ImageCollection.get_meandata() 
+
+        Returns
+        -------
+        None
+            sets self.daily_ccds
+                
+        """
+        super().build_daily_ccds(corr_overscan=True, corr_nl=True, chunkreduction=None,
+                         use_dask=None, **kwargs)
+        
+        
+        if corr_bias : 
+            ccd_list = self._correct_master_bias("daily", **bias_opt)
+            setattr(self, "_daily_ccds", ccd_list)
+        
+        if normalize : 
+            self._normalize(apply_period="daily")
+    
+    
+    def _normalize(self,apply_period="daily"):
+        """
+        Normalize the period flats.
+        Only called within build_{apply_period}_ccds.
+        
+        Should not be called externally.
+        
+        Parameters  
+        ----------
+        apply_period: str, default="daily")
+            Period to normalize. Can be either "daily" or "period".
+            
+            
+        
+        Returns :
+        None
+            resets self.{apply_period}_ccds
+        
+        """
+        data = getattr(self, '_'+apply_period+'_ccds')
+        if "dask" in str(type(data[0])) :
+            npda = da
+        else : 
+            npda = np
+        
+        data = npda.stack(data, axis=0)
+        data /= npda.nanmedian(data,axis=0) 
+        
+        setattr(self, '_'+apply_period+'_ccds', [_arr for arr in data])
+                    
+    def store_period_ccds(self, ccdid=None, ledid=None, filtername=None, use_dask=True,  **kwargs):
+        """
+        Function to store created period_ccds
+        
+        Parameters 
+        ----------
+        ccdid: int or None
+            id of the CCD
+            
+        ledid: int or None
+            = must be given if filtername is None =
+            id of the LED. 
+
+        filtername: str or None
+            = must be given if ledid is None =
+            name of the filter (zg, zr, zi)
+            
+        **kwargs 
+            Extra arguments to pass to the fits.writeto function.
+        
+        Returns
+        -------
+        list 
+            List of filenames to which where written the data.
+        
+        """
+        datalist = self.init_datafile.copy()
+            
+        datalist = self.init_datafile.copy()
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        if ledid is not None:
+            ledid = np.atleast_1d(ledid)
+            datalist = datalist[datalist["ledid"].isin(ledid)]
+
+        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
+
+        outs = []
+        if "dask" in str(type(self.period_ccds[0])): 
+            for ccdid, ledid in ids : 
+                fileout = self.get_fileout(ccdid=ccdid, ledid=ledid)
+                data = self.period_ccds[ccdid-1].compute()
+                out = self._to_fits(fileout, data, **kwargs)
+                outs.append(out)
+                
+        else : 
+            for ccdid, ledid in ids : 
+                fileout = self.get_fileout(ccdid=ccdid, ledid=ledid)
+                data = self.period_ccds[ccdid-1]
+                out = self._to_fits(fileout, data, **kwargs)
+                outs.append(out)
+                
+        return outs
+    
 class BiasPipe( CalibPipe ):
     _KIND = "bias"
     

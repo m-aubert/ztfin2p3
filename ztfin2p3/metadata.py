@@ -7,7 +7,71 @@ import warnings
 from .utils.tools import parse_singledate
 
 
+
 __all__ = ["get_raw"]
+
+
+def download_metadata(kind="raw", year_range=[2018, 2024], use_dask=False, overwrite=False):
+    """ """
+    from ztfquery import query
+    from datetime import datetime
+    from .io import LOCALSOURCE
+    if use_dask:
+        import dask
+
+    today = time.Time(datetime.now())
+
+    dirout = os.path.join(BASESOURCE, f"meta/{kind}")
+    os.makedirs(dirout, exist_ok=True)    
+    
+    for year in range(*year_range): # loop over years
+        
+        for month in range(1,13): # loop over months
+            # where the data will be stored.
+            fileout = os.path.join(dirout, f"{kind}object_metadata_{year:04d}{month:02d}.parquet")
+        
+            if os.path.isfile(fileout):
+                if not overwrite:
+                    warnings.warn(f"{fileout} already exists and overwrite = False, skyping")
+                continue
+
+            # 1 month time range definition
+            tstart = time.Time(f"{year:04d}-{month:02d}-01")
+            if month == 12: # january of next year
+                tstop = time.Time(f"{year+1:04d}-01-01")
+            else: 
+                tstop = time.Time(f"{year:04d}-{month+1:02d}-01")
+            # This is in the future...
+            if tstop>today:
+                print(f"{tstop} is in the future...")
+                continue
+
+            # to dask or not to dask.
+            if use_dask:
+                zquery = dask.delayed(query.ZTFQuery)()
+                outs = []
+            else:
+                zquery = query.ZTFQuery()
+                outs = None
+            
+            try:
+                if not use_dask:
+                    print(f"running {fileout}")
+                # using get_metadata to generalise with dask.
+                data = zquery.get_metadata(kind, sql_query=f"obsjd between {tstart.jd} and {tstop.jd}")
+                output = data.to_parquet(fileout)
+                if use_dask:
+                    outs.append(output)
+                else:
+                    print(f"stored to {fileout}")
+            except:
+                print(f"Failed for {fileout}")
+
+    # list of delayed or None.
+    return outs
+
+
+
 
 def get_rawfile(which, date, ccdid=None, fid=None,
                 **kwargs):

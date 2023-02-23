@@ -73,3 +73,49 @@ def header_from_files(files, keys, refheader_id=0, inputkey="INPUT"):
         newheader.set(f"{inputkey}{i:02d}",basename_, "input image")
         
     return newheader
+
+
+# ----------------------------- #
+#  Hierarchical Triangular Mesh #
+# ----------------------------- #
+def get_htm_intersect(ra, dec, radius, depth=7, **kwargs):
+    """ Module to get htm overlap (ids)  
+    = Based on HMpTy (pip install HMpTy) =
+
+    Parameters
+    ----------
+    ra, dec: [floatt]
+        central point coordinates in decimal degrees or sexagesimal
+    
+    radius: [float]
+        radius of circle in degrees
+
+    depth: [int] -optional-
+        depth of the htm
+        
+    **kwags goes to HMpTy.HTM.intersect 
+         inclusive:
+             include IDs of triangles that intersect the circle as well as 
+             those completely inclosed by the circle. Default True
+
+    Returns
+    -------
+    list of ID (htm ids overlapping with the input circle.)
+    """
+    from HMpTy import HTM
+    return HTM(depth=depth).intersect(ra, dec, radius, **kwargs)
+
+# --------------------------- #
+# - Conversion Tools        - #
+# --------------------------- #
+def njy_to_mag(njy_, njyerr_=None):
+    """ get AB magnitudes corresponding to the input nJy fluxes.
+    Returns
+    -------
+    mags (or mags, dmags if njyerr_ is not None)
+    """
+    mags = -2.5*np.log10(njy_*10**(-9)/3631)
+    if njyerr_ is None:
+        return mags
+    dmags = +2.5/np.log(10) * njyerr_ / njy_
+    return mags, dmags

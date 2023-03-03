@@ -231,7 +231,7 @@ class CalibrationBuilder( object ): # /day /week /month
     def build_and_store(self, fileout, overwrite=True, 
                         corr_nl=True, corr_overscan=True,
                         chunkreduction=2,
-                        set_it=False, incl_header=True,
+                        set_it=False, incl_header=False,
                         header_keys=None, **kwargs):
         """ build the data and store them into a fits file.
         
@@ -302,7 +302,7 @@ class CalibrationBuilder( object ): # /day /week /month
 
     
     def build(self, corr_nl=True, corr_overscan=True,
-                  set_it=False, incl_header=True,
+                  set_it=False, incl_header=False,
                   header_keys=None, chunkreduction=2,
                   dask_on_header=False, **kwargs):
         """ build the mean data.

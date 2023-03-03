@@ -279,18 +279,17 @@ class FlatPipe( CalibPipe ):
                 self.build_period_ccds(**kwargs)
             
         datalist = self.init_datafile.copy()
+        datalist = bpip_baseline_period.init_datafile.reset_index().groupby(["ccdid", "ledid"])["index"].count()
+        datalist = pd.Series(np.arange(len(datalist)) , index=datalist)  #Artisanal.
+        
         if ccdid is not None:
-            ccdid = np.atleast_1d(ccdid)
-            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+            datalist = datalist.loc[np.atleast_1d(ccdid)]
 
         if ledid is not None:
-            ledid = np.atleast_1d(ledid)
-            datalist = datalist[datalist["ledid"].isin(ledid)]
-
-        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
-
-        ccds_im = [ztfimg.CCD.from_data(ccd_arr) for ccd_arr in self.period_ccds]
-        ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
+            datalist = datalist.loc[np.atleast_1d(ledid)]
+    
+        ccds_im = [ztfimg.CCD.from_data(self.period_ccds[i]) for i in range(len(datalist.values))]
+        ccds = pandas.Series(data=ccds_im, dtype="object", index=datalist.index)
 
         return ccds
     
@@ -341,13 +340,13 @@ class FlatPipe( CalibPipe ):
             List of arrays. Dask array if use_dask in init , numpy otherwise.
         """
         
+        if not apply_period in ["daily", "period"]:
+            raise ValueError()
+                
         datalist = self.init_datafile.copy()
         datalist["NFrames"] = datalist["filepath"].apply(len)
         #datalist.groupby(["ccdid", "ledid"]).Nframes.apply(sum)
-        
-        if not apply_period in ["daily", "period"]:
-            raise ValueError()
-        
+                
         bias = BiasPipe.from_period(*self.period)
         bias_ccds = bias.get_period_ccd(from_file=from_file, **kwargs)
         
@@ -414,7 +413,7 @@ class FlatPipe( CalibPipe ):
         if normalize : 
             self._normalize(apply_period="period")
             
-    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True, chunkreduction=None, use_dask=None, normalize=False,  bias_opt={}, **kwargs):
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True, apply_period="daily", chunkreduction=None, use_dask=None, normalize=False,  bias_opt={}, **kwargs):
         """ Overloading of the build_daily_ccds
         loads the daily CalibrationBuilder based on init_datafile.
 
@@ -430,7 +429,12 @@ class FlatPipe( CalibPipe ):
             
         corr_bias : bool
             Should data be corrected for master bias
-
+            
+        apply_period: str, default 'daily'
+            When should the bias corr happen. 
+            'init' , upon loading the raw flats.
+            'daily' , after creating the daily flats.
+            
         chunkreduction: int or None
             rechunk and split of the image.
             If None, no rechunk
@@ -454,13 +458,54 @@ class FlatPipe( CalibPipe ):
         None
             sets self.daily_ccds
                 
-        """
-        super().build_daily_ccds(corr_overscan=True, corr_nl=True, chunkreduction=None,
-                         use_dask=None, **kwargs)
+        """        
+        if corr_bias and apply_period == "init": 
+            
+            if use_dask is None:
+                from dask import distributed
+                try:
+                    _ = distributed.get_client()
+                    use_dask = True
+                except:
+                    use_dask = False
+                    print("no dask")
+                
+            # function 
+            calib_from_images = CalibrationBuilder.from_images
+            #if use_dask:
+            #    import dask
+            #    calib_from_images = dask.delayed(calib_from_images)
+
+            #Overscan corr will be done in loop
+            prop = {**dict(chunkreduction=chunkreduction), **kwargs}
+
+            bias = BiasPipe.from_period(*self.period)
+            bias_ccds = bias.get_period_ccd(**bias_opt)
+
+            data_outs = []
+            for i_, s_ in self.init_datafile.iterrows():
+                filesin = s_["filepath"]
+                ccd_col =  ztfimg.collection.RawCCDCollection.from_filenames(filesin).get_data(corr_overscan=corr_overscan, corr_nl=corr_nl)
+                ccd_col -= bias_ccds.loc[s_.ccdid].data
+                new_ccds  = [ztfimg.RawCCD.from_data(ccd) for ccd in ccd_col]
+                fbuilder = calib_from_images(new_ccds,
+                                             raw=True, as_path=True,
+                                             persist=False, use_dask=use_dask)
+
+                data = fbuilder.build(**prop)[0]
+                data_outs.append(data)
+
+            #if use_dask:
+            #    data_outs = dask.delayed(list)(data_outs).compute()
+
+            self._daily_ccds = data_outs
+
+        else : 
+            super().build_daily_ccds(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction,
+                         use_dask=use_dask, **kwargs)
         
-        
-        if corr_bias : 
-            ccd_list = self._correct_master_bias("daily", **bias_opt)
+        if corr_bias and apply_period == "daily" : 
+            ccd_list = self._correct_master_bias(apply_period, **bias_opt)
             setattr(self, "_daily_ccds", ccd_list)
         
         if normalize : 

@@ -275,6 +275,7 @@ class CalibPipe( BasePipe ):
         ids = datalist.reset_index().groupby(["ccdid"]).last().index.sort_values() 
 
         ccds_im = [ztfimg.CCD.from_data(self.period_ccds[i-1]) for i in ids]
+        
         ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
 
         return ccds
@@ -322,7 +323,7 @@ class CalibPipe( BasePipe ):
             the full merged focalplane.
         """
         ccds = self.get_period_ccd(**kwargs)
-        focal_plane = ztfimg.FocalPlane(ccds=ccds.values, ccdids=ccdids.index)
+        focal_plane = ztfimg.FocalPlane(ccds=ccds.values, ccdids=ccds.index)
         return focal_plane
     
     def get_focalplane(self, mergedhow="mean"):
@@ -412,7 +413,6 @@ class CalibPipe( BasePipe ):
 
         # to keep the same format as the other get_functions:
         datalist = datalist.reset_index().set_index(["day","ccdid"])["index"]
-
         ccds = [ztfimg.CCD.from_data(self.daily_ccds[i])
                      for i in datalist.values]
 

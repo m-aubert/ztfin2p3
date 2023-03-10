@@ -7,7 +7,7 @@ import numpy as np
 from astropy.io import fits
 
 import ztfimg
-import . import __version__
+from . import __version__
 
 def build_science_image(rawfile, flatfile, biasfile,
                             as_path=False,

@@ -2,9 +2,42 @@
 
 import os
 from ztfquery.io import LOCALSOURCE
+from ztfquery import buildurl
 BASESOURCE = os.path.join(LOCALSOURCE, "ztfin2p3")
 
 PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
+
+
+# ================ #
+#                  #
+#  USED            #
+#                  #
+# ================ #
+
+def ipacfilename_to_ztfin2p3filepath(filename):
+    """ convert an ipac format filename to a filepath for the ztfin2p3 pipeline """
+    kind = buildurl.filename_to_kind(filename)
+    # Science
+    if kind == "sci":
+        ipac_filepath = buildurl.filename_to_url(filename, source="local")
+        # new filename. Replace:
+        # dirpath: /sci/bla -> /ztfin2p3/sci/bla 
+        # basename: ztf_* -> ztfin2p3_*
+        filepath = ipac_filepath.replace("/sci","/ztfin2p3/sci").replace("/ztf_","/ztfin2p3_")
+        
+    else:
+        raise NotImplementedError("only 'sci' object filename to filepath implemented")
+        
+    return filepath
+
+
+
+
+
+
+
+
+
 
 def get_config(which):
     """ 

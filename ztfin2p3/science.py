@@ -3,15 +3,17 @@
 import os
 import warnings
 import numpy as np
+from datetime import datetime
 
 from astropy.io import fits
 
 import ztfimg
 from . import __version__
 
+
 def build_science_image(rawfile, flatfile, biasfile,
                             as_path=False,
-                            corr_nl=True, corr_overscan=True,
+                            corr_nl=True, cordater_overscan=True,
                             overwrite=True):
     """ Top level method to build a science image.
 

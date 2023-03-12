@@ -15,7 +15,7 @@ PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
 # ================ #
 
 def ipacfilename_to_ztfin2p3filepath(filename):
-    """ convert an ipac format filename to a filepath for the ztfin2p3 pipeline """
+    """ convert an ipac-format filename into a filepath for the ztfin2p3 pipeline """
     kind = buildurl.filename_to_kind(filename)
     # Science
     if kind == "sci":
@@ -31,6 +31,12 @@ def ipacfilename_to_ztfin2p3filepath(filename):
     return filepath
 
 
+
+# ================ #
+#                  #
+#  To Be Checked   #
+#                  #
+# ================ #
 
 
 

@@ -98,7 +98,9 @@ def build_science_image(rawfile, flat, bias,
 
     return outs
 
-def store_science_image(new_data, new_headers, new_filenames, use_dask=False)
+def store_science_image(new_data, new_headers, new_filenames,
+                        use_dask=False,
+                        overwrite=True):
     """ store data in the input filename. 
     
     this method handles dask.

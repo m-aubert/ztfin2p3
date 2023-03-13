@@ -132,7 +132,7 @@ def store_science_image(new_data, new_headers, new_filenames,
         # make sure the directory exists.        
         os.makedirs( os.path.dirname(file_), mode=777, exist_ok=True)
         # writing data.
-        if dask_level is not None:
+        if use_dask:
             out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
         else:
             out = fits.writeto(file_, data_, header=header_, overwrite=overwrite)

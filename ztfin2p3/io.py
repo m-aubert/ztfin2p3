@@ -2,9 +2,114 @@
 
 import os
 from ztfquery.io import LOCALSOURCE
+import numpy as np
+from ztfquery import buildurl
 BASESOURCE = os.path.join(LOCALSOURCE, "ztfin2p3")
-
+CAL_DIR = os.path.join(BASESOURCE, "cal")
 PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
+
+
+# ================ #
+#                  #
+#  USED            #
+#                  #
+# ================ #
+
+def ipacfilename_to_ztfin2p3filepath(filename):
+    """ convert an ipac-format filename into a filepath for the ztfin2p3 pipeline """
+    kind = buildurl.filename_to_kind(filename)
+    # Science
+    if kind == "sci":
+        ipac_filepath = buildurl.filename_to_url(filename, source="local")
+        # new filename. Replace:
+        # dirpath: /sci/bla -> /ztfin2p3/sci/bla 
+        # basename: ztf_* -> ztfin2p3_*
+        filepath = ipac_filepath.replace("/sci","/ztfin2p3/sci").replace("/ztf_","/ztfin2p3_")
+        
+    else:
+        raise NotImplementedError("only 'sci' object filename to filepath implemented")
+        
+    return filepath
+
+
+
+
+def get_flatfiles(date, filtername, ccdid=None):
+    """ get the flat filepath for the given date and filtername
+
+    Parameters
+    ----------
+    date: str
+        date in the YYYYMMDD or YYYY-MM-DD format.
+
+    filtername: str
+        name of the filter (zg, zr or zi)
+
+    ccdid: int, list
+        number of the ccd [1->16] or list of.
+        If None, all 16 ccd assumed.
+
+    Returns
+    -------
+    list
+        list of flat filepath.
+    """
+    if ccdid is None:
+        ccdid = np.arange(1,17)
+
+    date = date.replace("-","") # generic format
+    # this will change once we move to period, not daily
+    year, month, day = date[:4], date[4:6], date[6:]
+    flatdir_ = os.path.join(CAL_DIR, "flat", year, f"{month}{day}")
+    filenames = [os.path.join(flatdir_, f"ztfin2p3_{date}_000000_{filtername}_c{ccdid_:02d}_l00_flat.fits")
+                 for ccdid_ in np.atleast_1d(ccdid)]
+    
+    return filenames
+
+
+def get_biasfiles(date, ccdid=None):
+    """ get the bias filepath for the given date
+
+    Parameters
+    ----------
+    date: str
+        date in the YYYYMMDD or YYYY-MM-DD format.
+
+    ccdid: int, list
+        number of the ccd [1->16] or list of.
+        If None, all 16 ccd assumed.
+
+    Returns
+    -------
+    list
+        list of bias filepath.
+    """
+    if ccdid is None:
+        ccdid = np.arange(1,17)
+
+    date = date.replace("-","") # generic format        
+    # this will change once we move to period, not daily        
+    year, month, day = date[:4], date[4:6], date[6:]
+    biasdir_ = os.path.join(CAL_DIR, "bias", year, f"{month}{day}")
+    filenames = [os.path.join(biasdir_, f"ztfin2p3_{date}_000000_bi_c{ccdid_:02d}_bias.fits")
+                 for ccdid_ in np.atleast_1d(ccdid)]
+    
+    return filenames
+
+
+
+# ================ #
+#                  #
+#  To Be Checked   #
+#                  #
+# ================ #
+
+
+
+
+
+
+
 
 def get_config(which):
     """ 

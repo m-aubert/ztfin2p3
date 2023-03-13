@@ -3,15 +3,21 @@
 import os
 import warnings
 import numpy as np
+from datetime import datetime
+
+import dask
 
 from astropy.io import fits
 
 import ztfimg
+from ztfquery.buildurl import get_scifile_of_filename
 from . import __version__
+from .io import ipacfilename_to_ztfin2p3filepath
 
-def build_science_image(rawfile, flatfile, biasfile,
-                            as_path=False,
-                            corr_nl=True, corr_overscan=True,
+def build_science_image(rawfile, flat, bias,
+                            dask_level=None, 
+                            corr_nl=True,
+                            corr_overscan=True,
                             overwrite=True):
     """ Top level method to build a science image.
 
@@ -22,11 +28,23 @@ def build_science_image(rawfile, flatfile, biasfile,
     rawfile: str
         filename or filepath of a raw image.
 
-    flatfile: path
-       fullpath to the ztfin2p3 pipeline ccd flatfile
+    flat, bias: str, ztfimg.CCD, array
+        ccd data to calibrate the rawimage
+        str: filepath
+        ccd: ccd object containing the data
+        array: numpy or dask array
 
-    biasfile: path
-        fullpath to the ztfin2p3 pipeline bias flatfile    
+    dask_level: None, "high", "low"
+        should this use dask and how ?
+        - None: dask not used.
+        - shallow: delayed at the `get_science_data` (and co) level
+        - medium: delayed at the `from_filename` level
+        - deep: dasked at the array level (native ztimg)
+        note:
+        - deep has extensive tasks but handle the memory
+        at its minimum ; it is faster to compute a few targets.
+        - shallow is faster when processing many files. 
+        It takes slightly more memory  but maintain the overhead at its minimum.
     
     corr_overscan: bool
         Should the data be corrected for overscan
@@ -41,48 +59,196 @@ def build_science_image(rawfile, flatfile, biasfile,
 
     Returns
     -------
-    None
-        this writes file.
-
+    list
+        results of fits.writeto (or delayed of that, see use_dask)
     """
-    # Step 1. Load what is needed ---------------------- #
-    # ZTFIN2P3 calibration file.
-    flat = ztfimg.CCD.from_filename(flatfile, as_path=True)
-    bias = ztfimg.CCD.from_filename(biasfile, as_path=True)
-    # -> raw file to calibrated
-    rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=as_path)
+    # new of ipac sciimg.
+    ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
+    new_filenames = [ipacfilename_to_ztfin2p3filepath(f) for f in ipac_filepaths]
     
-    # -> Reference Science image | needed header
-    ipac_ccd = rawccd.get_sciimage(as_ccd=True)
+    
+    if dask_level == "shallow": # dasking at the top level method
+        new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
+                                                        dask_level=None,
+                                                        corr_nl=corr_nl,
+                                                        corr_overscan=corr_overscan)
+    
+        new_header = dask.delayed(build_science_headers)(rawfile,
+                                                            ipac_filepaths=ipac_filepaths,
+                                                            use_dask=False)
+    
+        # note that filenames are not delayed even if dasked.
+        outs = dask.delayed(store_science_image)(new_data, new_header, new_filenames,
+                                                    use_dask=False)
+    else:
+        use_dask = dask_level is not None
+        new_data = build_science_data(rawfile, flat, bias,
+                                          dask_level=use_dask,
+                                          corr_nl=corr_nl,
+                                          corr_overscan=corr_overscan)
+    
+        new_header = build_science_headers(rawfile,
+                                            ipac_filepaths=ipac_filepaths,
+                                            use_dask=use_dask)
+    
+        # note that filenames are not delayed even if dasked.
+        outs = store_science_image(new_data, new_header, new_filenames,
+                                   use_dask=use_dask)
+    
 
+    return outs
+
+def store_science_image(new_data, new_headers, new_filenames,
+                        use_dask=False,
+                        overwrite=True):
+    """ store data in the input filename. 
+    
+    this method handles dask.
+
+    Parameters
+    ----------
+    new_data: list
+        list of 2d-array (quadrant format) | numpy or dask
+
+    new_header: list
+        list of header (or delayed)
+
+    new_filenames: list 
+        list of full path where the data shall be stored.
+    
+    use_dask: bool
+        shall this use dask while storing.
+        careful if this is false while data are dask.array
+        this will compute them.
+
+    Returns
+    -------
+    list
+        return of individual writeto.
+    
+    """
+    outs = []
+    for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
+        # make sure the directory exists.        
+        os.makedirs( os.path.dirname(file_), mode=777, exist_ok=True)
+        # writing data.
+        if use_dask:
+            out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
+        else:
+            out = fits.writeto(file_, data_, header=header_, overwrite=overwrite)
+            
+        outs.append(out)
+        
+    return outs
+
+
+def build_science_data(rawfile,
+                      flat, bias,
+                      dask_level=None, 
+                      corr_nl=True,
+                      corr_overscan=True):
+    """ 
+    Parameters
+    ----------
+    rawfile: str
+        filename or filepath of a raw image.
+
+    flat, bias: str, ztfimg.CCD, array
+        ccd data to calibrate the rawimage
+        str: filepath
+        ccd: ccd object containing the data
+        array: numpy or dask array
+
+    dask_level: None, "high", "low"
+        should this use dask and how ?
+        - None: dask not used.
+        - medium: delayed at the `from_filename` level
+        - deep: dasked at the array level (native ztimg)
+        note:
+        - deep has extensive tasks but handle the memory
+        at its minimum ; it is faster to compute a few targets.
+        - shallow is faster when processing many files. 
+        It takes slightly more memory  but maintain the overhead at its minimum.
+    
+    corr_overscan: bool
+        Should the data be corrected for overscan
+        (if both corr_overscan and corr_nl are true, 
+        nl is applied first)
+
+    corr_nl: bool
+        Should data be corrected for non-linearity
+
+    Parameters
+    ----------
+    list
+       list of the 2 quadrant data. 
+    """
+    # Generic I/O for flat and bias
+    if type(flat) is str:
+        print("flat from str")
+        flat = ztfimg.CCD.from_filename(flat, as_path=True,
+                                        use_dask=use_dask).get_data()    
+    elif ztfimg.CCD in flat.__class__.__mro__:
+        flat = flat.get_data()
+    elif not "array" in str( type(flat) ): # numpy or dask
+        raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
+    
+    # bias
+    if type(bias) is str:
+        bias = ztfimg.CCD.from_filename(bias, as_path=True,
+                                        use_dask=use_dask).get_data()    
+    elif ztfimg.CCD in bias.__class__.__mro__:
+        bias = bias.get_data()
+    elif not "array" in str( type(flat) ): # numpy or dask
+        raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
+
+    # Create the new data
+    
+    if dask_level is None:
+        rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=True, use_dask=False)
+        
+    elif dask_level == "medium":
+        rawccd = dask.delayed(ztfimg.RawCCD.from_filename)(rawfile, 
+                                                           as_path=True, 
+                                                           use_dask=False)
+    elif dask_level == "deep":
+        rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=as_path, use_dask=True)
+    else:
+        raise ValueError(f"dask_level should be None, 'medium' or 'deep', {dask_level} given")
+    
     # Step 2. Create new data, header, filename -------- #
     # new science data
     calib_data = rawccd.get_data(corr_nl=corr_nl, corr_overscan=corr_overscan)
-    # ====== #
-    # Pixel bias correction comes here
-    # ====== #
-    calib_data -= bias.get_data() # bias correction
-    calib_data /= flat.get_data() # flat correction
-
+    if dask_level == "medium": # calib_data is a 'delayed'.
+        calib_data = dask.array.from_delayed(calib_data, dtype="float32", 
+                                             shape=ztfimg.RawCCD.SHAPE)
+        
+    # calib_data = XXX # Pixel bias correction comes here
+    calib_data -= bias # bias correction
+    calib_data /= flat # flat correction
+    
     # CCD object to accurately split the data.
-    sciccd = ztfimg.CCD.from_data(calib_data)
-    # individual quadrant's data | reoder = False  to get "natural" ztf-ordering
+    sciccd = ztfimg.CCD.from_data(calib_data) # dask.array if use_dask
     new_data = sciccd.get_quadrantdata(from_data=True, reorder=False) # q1, q2, q3, q4
-    # new headers
-    new_headers = [header_from_quadrantheader(ipac_ccd.get_quadrant(i).get_header())
-                       for i in range(1,5)]
-    # new filename. Replace:
-    # dirpath: /sci/bla -> /ztfin2p3/sci/bla 
-    # basename: ztf_* -> ztfin2p3_*
-    new_filenames = [f.replace("/sci","/ztfin2p3/sci").replace("/ztf_","/ztfin2p3_") for f in ipac_ccd.filepaths]
+    return new_data
 
-    # Step 3. Storing --------------------------------- #    
-    for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
-        # make sure the directory exists.        
-        os.makedirs( os.path.dirname(file_), mode=771, exist_ok=True)
-        # writing data.
-        fits.writeto(file_, data_, header=header_,
-                         overwrite=overwrite)
+
+def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
+    """ """
+    if ipac_filepaths:
+        ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
+
+    new_headers = []
+    for sciimg_ in ipac_filepaths:
+        if use_dask:
+            header = dask.delayed(fits.getheader)(sciimg_)
+        else:
+            header = fits.getheader(sciimg_)
+            
+        new_headers.append(header_from_quadrantheader(header))
+
+    return new_headers
+
 
     
 def header_from_quadrantheader(header, skip=["CID", "CAL", "MAG", "CLRC", "ZP", "APCOR", 
@@ -105,6 +271,9 @@ def header_from_quadrantheader(header, skip=["CID", "CAL", "MAG", "CLRC", "ZP", 
         a copy of the input header minus the skip plus some
         more information.
     """
+    if "dask" in str( type(header) ):
+        return dask.delayed(header_from_quadrantheader)(header, skip=skip)
+
 
     newheader = fits.Header()
     for k in header.keys() :

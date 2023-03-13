@@ -81,29 +81,29 @@ class CalibrationBuilder( object ): # /day /week /month
             from ztfimg.buildurl import filename_to_kind
             raw = filename_to_kind(filenames[0]) == "raw"
         
-        if raw:
-            CcdCollection = collection.RawCCDCollection
-        else:
-            CcdCollection = collection.CCDCollection
+        #if raw:
+        CcdCollection = collection.ImageCollection
+        #else:
+        #    CcdCollection = collection.CCDCollection
             
         flatcollection = CcdCollection.from_filenames(filenames, use_dask=use_dask,
                                                       persist=persist, as_path=as_path, **kwargs)
         return cls(flatcollection)
 
     
-    @classmethod
-    def from_images(cls, images, raw=True, **kwargs):
-        """
-        """
-        from ztfimg import collection
-        if raw:
-            CcdCollection = collection.RawCCDCollection
-        else:
-            CcdCollection = collection.CCDCollection
-        
-        flatcollection = CcdCollection.from_images(images)
-        
-        return cls(flatcollection)     
+    #@classmethod
+    #def from_images(cls, images, raw=True, **kwargs):
+    #    """
+    #    """
+    #    from ztfimg import collection
+    #    if raw:
+    #        CcdCollection = collection.RawCCDCollection
+    #    else:
+    #        CcdCollection = collection.CCDCollection
+    #    
+    #    flatcollection = CcdCollection.from_images(images)
+    #    
+    #    return cls(flatcollection)     
     
     def to_fits(self, fileout, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format 
@@ -413,11 +413,12 @@ class CalibrationBuilder( object ): # /day /week /month
         
         # This could be updated in the calibration function #
         
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
-                       chunkreduction=chunkreduction),
-                **kwargs}
+        #prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
+        #               chunkreduction=chunkreduction),
+        #        **kwargs}
             
-        data = self.imgcollection.get_meandata(**prop)
+        data =self.imgcollection.get_data(**dict(corr_overscan=corr_overscan, corr_nl=corr_nl))
+        data = get_meandata(chunkreduction=chunkreduction, **kwargs) #self.imgcollection.get_meandata(**prop)
         if incl_header:
             header = self.build_header(keys=header_keys,
                                        use_dask=dask_on_header)
@@ -496,12 +497,8 @@ class CalibrationBuilder( object ): # /day /week /month
         else:
             header = None
             
-        data = self.imgcollection.get_data(**prop_data) - corr
-        
-        #Annoying but loop is necessary
-        newcol = collection.RawCCDCollection.from_images([ RawCCD.from_data(data[i,:,:]) for i in range(data.shape[0])])
-        
-        data = newcol.get_meandata(**prop)
+        data = self.imgcollection.get_data(**prop_data) - corr        
+        data = get_meandata(**prop)
         
         self.set_imgcollection(newcol)
            

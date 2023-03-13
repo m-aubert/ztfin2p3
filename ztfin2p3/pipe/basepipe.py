@@ -167,14 +167,11 @@ class CalibPipe( BasePipe ):
         else : 
             _groupbyk = ['day', 'ccdid']
             ids = datalist.reset_index().set_index(_groupbyk)["index"].values
-            index = datalist.reset_index().set_index(_groupbyk).index
-        
+            # to keep the same format as the other get_functions:
+            #index = datalist.reset_index().set_index(_groupbyk).index
+
         pdata = getattr(self, periodicity+'_ccds')
-        #if not ccdid : 
-        #    ids = datalist.reset_index().groupby("ccdid").last().index.sort_values()
-        #else : 
-        #    ids = np.atleast_1d(ccdid)
-            
+
         outs = []
         if "dask" in str(type(pdata[0])): 
             for ccdid in ids : 

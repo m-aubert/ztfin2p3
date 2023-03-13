@@ -130,7 +130,6 @@ class FlatPipe( CalibPipe ):
         ztfimg.FocalPlane
             the full merged focalplane.
         """
-        #ccds_df = self.get_period_ccd(ledid=ledid,**kwargs)
         ccds_df = self.get_period_ccd(ledid=ledid)
         ledids = np.unique(ccds_df.index.get_level_values(1))
         ccdids = np.arange(1,17)
@@ -331,24 +330,6 @@ class FlatPipe( CalibPipe ):
 
         return ccds
     
-    #def get_period_ccd_fromfile(self, ccdid=None, ledid=None, use_dask=True):
-    #    datalist = self.init_datafile.copy()
-    #    if ccdid is not None:
-    #        ccdid = np.atleast_1d(ccdid)
-    #        datalist = datalist[datalist["ccdid"].isin(ccdid)]
-    #
-    #    if ledid is not None:
-    #        ledid = np.atleast_1d(ledid)
-    #        datalist = datalist[datalist["ledid"].isin(ledid)]
-    #
-    #    ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
-    #            
-    #    ccds = [ztfimg.RawCCD.from_data(self._from_fits(self.get_fileout(ccdid=ccdval, ledid=ledval), use_dask=use_dask)) for ccdval, ledval in ids]
-    #    
-    #    outp = pandas.Series(data=ccds, dtype="object", index=ids)
-    #    return outp
-    
-    
     def _correct_master_bias(self, apply_period, from_file=False, **kwargs):
         """ 
         Function to apply master bias correction to designated period.
@@ -508,16 +489,12 @@ class FlatPipe( CalibPipe ):
                 
             # function 
             calib_from_filenames= CalibrationBuilder.from_filenames
-            #if use_dask:
-            #    import dask
-            #    calib_from_filenames = dask.delayed(calib_from_filenames)
 
             #Overscan corr will be done in loop            
             prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
                     chunkreduction=chunkreduction), 
                 **kwargs}
                
-            #Should set an attribute self.bias
             bias = BiasPipe.from_period(*self.period)
             bias_ccds = bias.get_daily_ccd(**bias_opt) #Hardcode dailies
 
@@ -532,9 +509,6 @@ class FlatPipe( CalibPipe ):
                 data = fbuilder.build_with_corr(corr = bias_ccds.loc[s_.day, s_.ccdid].data ,
                                                **prop)[0]
                 data_outs.append(data)
-
-            #if use_dask:
-            #    data_outs = dask.delayed(list)(data_outs).compute()
 
             self._daily_ccds = data_outs
 
@@ -580,7 +554,7 @@ class FlatPipe( CalibPipe ):
         
         setattr(self, '_'+apply_period+'_ccds', datai ) #Now we have an array instead
                     
-    def store_period_ccds(self, ccdid=None, ledid=None, filtername=None, use_dask=True,  **kwargs):
+    def store_period_ccds(self, ccdid=None, ledid=None, filtername=None, use_dask=True, **kwargs):
         """
         Function to store created period_ccds
         
@@ -597,6 +571,10 @@ class FlatPipe( CalibPipe ):
             = must be given if ledid is None =
             name of the filter (zg, zr, zi)
             
+        apply_period : str , default 'period'
+            Which period ccds will be saved. 
+            If filter, will use the combined filters. Otherwise the period.
+            
         **kwargs 
             Extra arguments to pass to the fits.writeto function.
         
@@ -607,20 +585,20 @@ class FlatPipe( CalibPipe ):
         
         """
         datalist = self.init_datafile.copy()
-            
+        datalist = datalist.groupby(["ccdid", "ledid"]).filepath.apply(len).reset_index()
+        datalist = datalist.reset_index().groupby(["ccdid", "ledid"]).index.apply(int)
+        
         if ccdid is not None:
             ccdid = np.atleast_1d(ccdid)
-            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+            datalist = datalist.loc[ccdid,:]
 
         if ledid is not None:
             ledid = np.atleast_1d(ledid)
-            datalist = datalist[datalist["ledid"].isin(ledid)]
-
-        ids = datalist.reset_index().groupby(["ccdid" , "ledid"]).last().index.sort_values() 
-
+            datalist = datalist.loc[:,ledid]
+        
         outs = []
         if "dask" in str(type(self.period_ccds[0])): 
-            for ccdid, ledid in ids : 
+            for ccdid, ledid in datalist.iterrows() : 
                 fileout = self.get_fileout(ccdid=ccdid, ledid=ledid)
                 data = self.period_ccds[ccdid-1].compute()
                 out = self._to_fits(fileout, data, **kwargs)
@@ -634,10 +612,50 @@ class FlatPipe( CalibPipe ):
                 outs.append(out)
                 
         return outs
+
+    def store_filter_ccds(self, ccdid=None, ledid=None, filtername=None, use_dask=True, **kwargs):
+        datalist = self.init_datafile.copy()
+        
+        if filtername is not None : 
+            datalist["filterid"] = datalist["ledid"]
+
+            for key, items in self._led_to_filter.items(): 
+                datalist["filterid"] = datalist.filterid.replace(items, key)
+            
+            filtername = np.atleast1d(filtername)
+            datalist = datalist[datalist['filterid'].isin(filtername)]
+            
+        if ccdid is not None:
+            ccdid = np.atleast_1d(ccdid)
+            datalist = datalist[datalist["ccdid"].isin(ccdid)]
+
+        if ledid is not None:
+            ledid = np.atleast_1d(ledid)
+            datalist = datalist[datalist["ledid"].isin(ledid)]
+
+        ids = datalist.reset_index().groupby(["ccdid" , "filterid"]).last().index.sort_values() 
+        
+        outs = []
+        if "dask" in str(type(self.filter_ccds[0])): 
+            for ccdid, ledid in ids : 
+                fileout = self.get_fileout(ccdid=ccdid, filtername=ledid)
+                data = self.filter_ccds[ccdid-1].compute()
+                out = self._to_fits(fileout, data, **kwargs)
+                outs.append(out)
+                
+        else : 
+            for ccdid, ledid in ids : 
+                fileout = self.get_fileout(ccdid=ccdid, ledid=ledid)
+                data = self.filter_ccds[ccdid-1]
+                out = self._to_fits(fileout, data, **kwargs)
+                outs.append(out)
+                
+        return outs
+    
     
     def build_filter_ccds(self,weights=None, axis=0, **kwargs):
-        #TO REWRITE HERE AS WELL.
-        
+        """
+        """
         if "dask" in str(type(self._period_ccds[0])) :
             npda = da
         else : 
@@ -660,14 +678,14 @@ class FlatPipe( CalibPipe ):
             ccdicol = npda.average(self.period_ccds[ccdi] , weights=weights, axis=axis)
             period_filters.append(ccdicol)
             
-        self._filter_ccds = period_filters
+        self._filter_ccds = npda.stack(period_filters, axis=0)
         
         
     def get_filter_ccd(self,filterid=None, ccdid=None):
         datalist= self.init_datafile.copy()
         datalist["filterid"] = datalist["ledid"] 
         
-        for key, items in self._led_to_filter().items() : 
+        for key, items in self._led_to_filter.items() : 
             datalist["filterid"] = period_ccd.replace(items, key)
         
         # to keep the same format as the other get_functions:

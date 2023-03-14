@@ -81,30 +81,13 @@ class CalibrationBuilder( object ): # /day /week /month
             from ztfimg.buildurl import filename_to_kind
             raw = filename_to_kind(filenames[0]) == "raw"
         
-        #if raw:
         CcdCollection = collection.ImageCollection
-        #else:
-        #    CcdCollection = collection.CCDCollection
             
         flatcollection = CcdCollection.from_filenames(filenames, use_dask=use_dask,
                                                       persist=persist, as_path=as_path, **kwargs)
         return cls(flatcollection)
 
-    
-    #@classmethod
-    #def from_images(cls, images, raw=True, **kwargs):
-    #    """
-    #    """
-    #    from ztfimg import collection
-    #    if raw:
-    #        CcdCollection = collection.RawCCDCollection
-    #    else:
-    #        CcdCollection = collection.CCDCollection
-    #    
-    #    flatcollection = CcdCollection.from_images(images)
-    #    
-    #    return cls(flatcollection)     
-    
+        
     def to_fits(self, fileout, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format 
 

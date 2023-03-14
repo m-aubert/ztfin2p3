@@ -73,6 +73,9 @@ class CalibPipe( BasePipe ):
         skip : int or None
             Number of bias to be skipped in the initial datafile.
             
+        **kwargs :
+            kwargs passed to the ztfin2p3.metadata.get_rawmeta()
+            
         """
         this = cls([start, end], use_dask=use_dask)
         # Load the associated metadata
@@ -138,7 +141,7 @@ class CalibPipe( BasePipe ):
     #  I/O functions    #
     # ----------------- # 
     
-    def store_ccds(self, periodicity="period", band=None, fits_kwargs = {}, **kwargs):
+    def store_ccds(self, periodicity="period", fits_kwargs = {}, **kwargs):
         """
         Function to store created period_ccds
         
@@ -146,7 +149,12 @@ class CalibPipe( BasePipe ):
         ----------
         
         ccdid : int (list of int) , default None
-            id of the ccdid. If None, will store all ccds. 
+            id of the ccdid. If None, will store all ccds.
+            
+        periodicity : str , default "period"
+            Which data to store : 
+                'daily' stores the available data self.daily_ccds. 
+                'period' tores the available data in self.period_ccds. 
             
         **kwargs 
             Extra arguments to pass to the fits.writeto function.
@@ -157,16 +165,18 @@ class CalibPipe( BasePipe ):
             List of filenames to which where written the data.
         
         """
-            
+                    
         datalist = self.init_datafile.copy()
         
         if periodicity == 'period' : 
-            _groupbyk = 'ccdid'
-            ids = datalist.reset_index().groupby("ccdid").last().index.sort_values()
-            index = np.column_stack([ids, [None]*len(ids)])
+            _groupbyk = ['ccdid']
+            datalist = datalist.reset_index().groupby(_groupbyk).day.apply(lambda x : None).reset_index()
+            datalist = datalist.reset_index()
+            
         else : 
-            _groupbyk = ['day', 'ccdid']
-            ids = datalist.reset_index().set_index(_groupbyk)["index"].values
+            _groupbyk = ['day','ccdid']
+            datalist = datalist.reset_index()
+            #ids = datalist.reset_index().set_index(_groupbyk)["index"].values
             # to keep the same format as the other get_functions:
             #index = datalist.reset_index().set_index(_groupbyk).index
 
@@ -174,9 +184,12 @@ class CalibPipe( BasePipe ):
 
         outs = []
         if "dask" in str(type(pdata[0])): 
-            for ccdid in ids : 
-                    fileout = self.get_fileout(ccdid=index[ccdid][1], periodicity=periodicity, day=index[ccdid][0], **kwargs)
-                    data = pdata[ccdid-1].compute() 
+            for i , row in datalist.iterrows() : 
+                    fileout = self.get_fileout(ccdid=row.ccdid, 
+                                               periodicity=periodicity, 
+                                               day=row.day)
+                    
+                    data = pdata[row.index].compute() 
                     out = self._to_fits(fileout, data, **fits_kwargs)
                     outs.append(out)
                     #Compute iteratively for low memory management. 
@@ -185,41 +198,16 @@ class CalibPipe( BasePipe ):
                     #. TBD.
                 
         else : 
-            for ccdid in ids : 
-                fileout = self.get_fileout(ccdid=ccdid, periodicity=periodicity, **kwargs)
-                data = getattr(self, periodicity+'_ccds')[ccdid-1].compute() 
+            for i,row in datalist.iterrows() : 
+                fileout = self.get_fileout(ccdid=row.ccdid, 
+                                            periodicity=periodicity, 
+                                            day=row.day,)
+                                            
+                data = pdata[row.index]
                 out = self._to_fits(fileout, data, **kwargs)
                 outs.append(out)
                 
         return outs
-    
-    #def get_period_ccd_fromfile(self, ccdid=None, use_dask=True):
-    #    """ load the period ccd for a given ccdid. 
-    #    The period ccd filename is the one provided by get_fileout.
-    #    
-    #    Parameters 
-    #    ----------
-    #    ccdid : int (list of int) , default None
-    #        id of the ccdid. If None, will load all ccds. 
-    #        
-    #    use_dask = bool , default True
-    #        Whether to use dask to load the ccds. 
-    #        
-    #    Returns
-    #    -------
-    #    pandas.Series
-    #        indexe as ccdid and values as ztfimg.CCD objects
-    #    """
-    #    if ccdid is not None : 
-    #        ids = np.sort(np.atleast_1d(ccdid).tolist())
-    #    else : 
-    #        datalist = self.init_datafile.copy()
-    #        ids = datalist.reset_index().groupby("ccdid").last().index.sort_values()
-                    
-    #    ccds = [ztfimg.RawCCD.from_data(self._from_fits(self.get_fileout(ccdid=val), use_dask=use_dask)) for val in ids]
-        
-    #    outp = pandas.Series(data=ccds, dtype="object", index=ids)
-    #    return outp
     
     def _to_fits(self, fileout, data, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format 
@@ -448,7 +436,6 @@ class CalibPipe( BasePipe ):
             ccdid = np.atleast_1d(ccdid)
             datalist = datalist[datalist["ccdid"].isin(ccdid)]
 
-        #if not from_file : 
         if not hasattr(self, '_daily_ccds'):
             self.build_daily_ccds(**kwargs)
             
@@ -605,11 +592,12 @@ class CalibPipe( BasePipe ):
             
         else : 
             
+            ccdlist = self.init_datafile.ccdid.unique()
+            
             data_outs = []
-            for ccdid in range(1,17) : 
+            for ccdid in ccdlist : 
                 data = self._from_fits(self.get_fileout(ccdid=val), use_dask=use_dask)
                 data_outs.append(data)
-            datalist = self.init_datafile.copy()
 
             self._period_ccds =data_outs
 
@@ -695,7 +683,7 @@ class CalibPipe( BasePipe ):
             if use_dask:
                 data_outs = dask.delayed(list)(data_outs).compute()
 
-            self._daily_ccds =data_outs
+            self._daily_ccds = data_outs
             
         else : 
             datalist = self.init_datafile.copy()

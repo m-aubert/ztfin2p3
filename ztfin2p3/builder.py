@@ -418,7 +418,7 @@ class CalibrationBuilder( object ): # /day /week /month
         #        **kwargs}
             
         data =self.imgcollection.get_data(**dict(corr_overscan=corr_overscan, corr_nl=corr_nl))
-        data = get_meandata(chunkreduction=chunkreduction, **kwargs) #self.imgcollection.get_meandata(**prop)
+        data = get_meandata(data,chunkreduction=chunkreduction, **kwargs) #self.imgcollection.get_meandata(**prop)
         if incl_header:
             header = self.build_header(keys=header_keys,
                                        use_dask=dask_on_header)
@@ -498,10 +498,8 @@ class CalibrationBuilder( object ): # /day /week /month
             header = None
             
         data = self.imgcollection.get_data(**prop_data) - corr        
-        data = get_meandata(**prop)
-        
-        self.set_imgcollection(newcol)
-           
+        data = get_meandata(data,**prop)
+                   
         if set_it:
             self.set_data(data)
             self.set_header(header)

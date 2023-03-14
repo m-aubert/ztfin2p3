@@ -248,8 +248,6 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
         new_headers.append(header_from_quadrantheader(header))
 
     return new_headers
-
-
     
 def header_from_quadrantheader(header, skip=["CID", "CAL", "MAG", "CLRC", "ZP", "APCOR", 
                                                      "FIXAPERS", "NMATCHES", "BIT", "HISTORY",

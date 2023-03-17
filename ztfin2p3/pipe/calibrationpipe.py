@@ -782,6 +782,48 @@ class FlatPipe( CalibPipe ):
                 outs.append(out)
                 
         return outs
+    
+    
+    def build_daily_filter_ccds(self, weights=None, axis=0):
+        """
+        Combine daily ccds per led to create daily filter ccds.
+
+        Parameters
+        ----------
+        weights : dict, default `dict(zg=None, zr=None, zi=None)`
+            Dictionnary storing for each filter the weights to apply to each led. 
+            Default is a dictionnary with empty fields.
+            
+        axis : int, default 0
+            Axis to average the LEDs.
+
+        Returns
+        -------
+        list
+            List of array_like objects storing each filter ccd per day.
+            
+        """
+        
+        if not weights :         
+            weights = dict(zg=None,  
+                           zr=None, 
+                           zi=None)
+        
+        period_ccd = self.init_datafile.copy()
+        period_ccd["filterid"] = period_ccd["ledid"]
+
+        for key, items in self._led_to_filter.items():
+            period_ccd["filterid"] = period_ccd.filterid.replace(items, key)
+
+        period_ccd = period_ccd.reset_index()
+        period_ccd = period_ccd.groupby(['day','ccdid', "filterid"]).index.apply(list)
+
+        period_filters = []
+        for i, ccdi in period_ccd.iteritems():
+            ccdicol = da.average(self.daily_ccds[ccdi] , weights=weights[i[2]], axis=axis)
+            period_filters.append(ccdicol)
+
+        return period_filters
         
 
     @property

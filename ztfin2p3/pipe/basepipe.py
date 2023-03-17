@@ -176,9 +176,6 @@ class CalibPipe( BasePipe ):
         else : 
             _groupbyk = ['day','ccdid']
             datalist = datalist.reset_index()
-            #ids = datalist.reset_index().set_index(_groupbyk)["index"].values
-            # to keep the same format as the other get_functions:
-            #index = datalist.reset_index().set_index(_groupbyk).index
 
         pdata = getattr(self, periodicity+'_ccds')
 
@@ -189,7 +186,7 @@ class CalibPipe( BasePipe ):
                                                periodicity=periodicity, 
                                                day=row.day)
                     
-                    data = pdata[row.index].compute() 
+                    data = pdata[row['index']].compute() 
                     out = self._to_fits(fileout, data, **fits_kwargs)
                     outs.append(out)
                     #Compute iteratively for low memory management. 
@@ -203,7 +200,7 @@ class CalibPipe( BasePipe ):
                                             periodicity=periodicity, 
                                             day=row.day,)
                                             
-                data = pdata[row.index]
+                data = pdata[row['index']]
                 out = self._to_fits(fileout, data, **kwargs)
                 outs.append(out)
                 
@@ -573,7 +570,7 @@ class CalibPipe( BasePipe ):
 
             calib_from_data = CalibrationBuilder.build_from_data
             
-            if type(self.daily_ccds) == str(list):
+            if type(self.daily_ccds) == str(type(list)):
                 
                 data_outs = []
                 for _, ccd_idx in ccds_dailycol.iteritems(): 
@@ -611,7 +608,7 @@ class CalibPipe( BasePipe ):
 
     def load_metadata(self, period=None, **kwargs):
         """ """
-        from ztfin2p3 import metadata        
+        from .. import metadata        
         if period is None and self._period is None:
             raise ValueError("no period given and none known")
         datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
@@ -696,7 +693,7 @@ class CalibPipe( BasePipe ):
                 ccd = ztfimg.CCD.from_filename(file_in, use_dask=use_dask ) 
                 data_outs.append(ccd.get_data(**kwargs))
             
-            self._daily_ccds =data_outs
+            self._daily_ccds = data_outs
         
     # ============== #
     #  Property      #

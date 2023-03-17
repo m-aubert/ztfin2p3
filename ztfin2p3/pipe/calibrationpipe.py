@@ -767,7 +767,7 @@ class FlatPipe( CalibPipe ):
                                                day=row.day, 
                                                ledid=row.ledid,
                                                 filtername=row.filterid)
-                    data = pdata[row.index].compute() 
+                    data = pdata[row['index']].compute() 
                     out = self._to_fits(fileout, data, **fits_kwargs)
                     outs.append(out)
                 
@@ -778,8 +778,7 @@ class FlatPipe( CalibPipe ):
                                             day=row.day, 
                                             ledid=row.ledid,
                                             filtername=row.filterid)
-                data = pdata[row.index]
-                out = self._to_fits(fileout, data, **kwargs)
+                out = self._to_fits(fileout, pdata[row['index']], **kwargs)
                 outs.append(out)
                 
         return outs

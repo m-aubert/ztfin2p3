@@ -417,7 +417,7 @@ class RawFlatMetaData( RawMetaData ):
     #   Super It        #
     # ================= #    
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None, add_filepath=True):
+    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None, add_filepath=True, **kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -448,6 +448,9 @@ class RawFlatMetaData( RawMetaData ):
         dataframe (IRSA metadata)
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
+        if not 'ledid' in data.columns : 
+            data = cls._add_ledinfo_to_datafile(data, **kwargs)
+        
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
             
@@ -489,8 +492,26 @@ class RawFlatMetaData( RawMetaData ):
         fileout = cls.get_monthly_metadatafile(year, month)
         data.to_parquet(fileout)
         return
+    
+    @staticmethod
+    def _add_ledinfo_to_datafile(data, use_dask=True): 
+        from astropy.io import fits
         
+        getfunc = fits.getval
         
+        if use_dask :
+            import dask
+            getfunc = dask.delayed(fits.getval)
+        
+        file_to_led = data.filepath.map(lambda x : getfunc(x, 'ILUM_LED'))
+        
+        if use_dask : 
+            data['ledid'] = dask.compute(*file_to_led)
+        else : 
+            data['ledid'] = file_to_led
+        
+        return data
+             
 class RawBiasMetaData( RawMetaData ):
     _SUBKIND = "bias"
 

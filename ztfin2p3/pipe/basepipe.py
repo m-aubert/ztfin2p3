@@ -570,12 +570,13 @@ class CalibPipe( BasePipe ):
 
             calib_from_data = CalibrationBuilder.build_from_data
             
-            if type(self.daily_ccds) == str(type(list)):
+            if type(self.daily_ccds) == list:
                 
                 data_outs = []
                 for _, ccd_idx in ccds_dailycol.iteritems(): 
-                    outi = calib_from_data(npda.stack([self.daily_ccds[ccd_idxi] for ccdixi in ccd_idx], axis=0) , 
-                                                                                 **prop)
+                    outi = calib_from_data(npda.stack([self.daily_ccds[ccdid_idxi] for ccdid_idxi in ccd_idx],
+                                                      axis=0) , 
+                                           **prop)
                     data_outs.append(outi)
                     
                 self._period_ccds = npda.stack(data_outs, axis=0)

@@ -325,7 +325,7 @@ def get_period_biasfile(start, end, ccdid, mkdirs=False):
     end = str(end).replace("-","") # so it accepts this format yyyy-mm-dd and yyyymmdd
 
     period = f"{start}{end}"
-    filestructure = f"ztfin2p3_{period}_000000_bi_c{ccdid:02d}_bias.fits'"
+    filestructure = f"ztfin2p3_{period}_000000_bi_c{ccdid:02d}_bias.fits"
     
     return os.path.join(BIAS_DIR, period, filestructure)
 

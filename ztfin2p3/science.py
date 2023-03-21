@@ -51,7 +51,7 @@ def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs)
         list of each build_science_image call's return.
     """
     outs = []
-    for raw_, flat_, bias_ in zip(rawfiles, biases, flats):
+    for raw_, bias_, flat_ in zip(rawfiles, biases, flats):
         delayed_or_not = build_science_image(raw_, bias=bias_, flat=flat_, dask_level=dask_level, **kwargs)
         _ = [outs.append(d_) for d_ in delayed_or_not]
 

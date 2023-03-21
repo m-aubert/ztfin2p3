@@ -14,6 +14,49 @@ from ztfquery.buildurl import get_scifile_of_filename
 from . import __version__
 from .io import ipacfilename_to_ztfin2p3filepath
 
+
+def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs):
+    """ give a list of individual raw-cdds with their 
+    corresponding flat and bias ccds.
+    
+    rawfiles: str
+        filenames or filepaths of the ccd images a raw image.
+
+    flats, biases: list
+        list of str, ztfimg.CCD or array.
+        This list size must match that of rawfiles for they 
+        are `zip` together.
+        These are the ccd data to calibrate the rawimage
+        str: filepath
+        ccd: ccd object containing the data
+        array: numpy or dask array
+
+    dask_level: None, "shallow", "medium", "deep"
+        should this use dask and how ?
+        - None: dask not used.
+        - shallow: delayed at the `get_science_data` (and co) level
+        - medium: delayed at the `from_filename` level
+        - deep: dasked at the array level (native ztimg)
+        note:
+        - deep has extensive tasks but handle the memory
+        at its minimum ; it is faster to compute a few targets.
+        - shallow is faster when processing many files. 
+        It takes slightly more memory  but maintain the overhead at its minimum.
+        
+    **kwargs goes to build_science_image
+
+    Returns
+    -------
+    list
+        list of each build_science_image call's return.
+    """
+    outs = []
+    for raw_, flat_, bias_ in zip(rawfiles, biases, flats):
+        delayed_or_not = build_science_image(raw_, bias=bias_, flat=flat_, dask_level=dask_level, **kwargs)
+        _ = [outs.append(d_) for d_ in delayed_or_not]
+
+    return outs
+
 def build_science_image(rawfile, flat, bias,
                             dask_level=None, 
                             corr_nl=True,
@@ -34,7 +77,7 @@ def build_science_image(rawfile, flat, bias,
         ccd: ccd object containing the data
         array: numpy or dask array
 
-    dask_level: None, "high", "low"
+    dask_level: None, "shallow", "medium", "deep"
         should this use dask and how ?
         - None: dask not used.
         - shallow: delayed at the `get_science_data` (and co) level
@@ -83,7 +126,7 @@ def build_science_image(rawfile, flat, bias,
     else:
         use_dask = dask_level is not None
         new_data = build_science_data(rawfile, flat, bias,
-                                          dask_level=use_dask,
+                                          dask_level=dask_level,
                                           corr_nl=corr_nl,
                                           corr_overscan=corr_overscan)
     
@@ -130,7 +173,7 @@ def store_science_image(new_data, new_headers, new_filenames,
     outs = []
     for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
         # make sure the directory exists.        
-        os.makedirs( os.path.dirname(file_), mode=777, exist_ok=True)
+        os.makedirs( os.path.dirname(file_), exist_ok=True)
         # writing data.
         if use_dask:
             out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
@@ -146,7 +189,8 @@ def build_science_data(rawfile,
                       flat, bias,
                       dask_level=None, 
                       corr_nl=True,
-                      corr_overscan=True):
+                      corr_overscan=True,
+                      as_path=True):
     """ 
     Parameters
     ----------
@@ -159,7 +203,7 @@ def build_science_data(rawfile,
         ccd: ccd object containing the data
         array: numpy or dask array
 
-    dask_level: None, "high", "low"
+    dask_level: None, "shallow", "medium", "deep"
         should this use dask and how ?
         - None: dask not used.
         - medium: delayed at the `from_filename` level
@@ -183,6 +227,7 @@ def build_science_data(rawfile,
     list
        list of the 2 quadrant data. 
     """
+    use_dask = dask_level is not None
     # Generic I/O for flat and bias
     if type(flat) is str:
         print("flat from str")

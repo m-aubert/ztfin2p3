@@ -230,7 +230,6 @@ def build_science_data(rawfile,
     use_dask = dask_level is not None
     # Generic I/O for flat and bias
     if type(flat) is str:
-        print("flat from str")
         flat = ztfimg.CCD.from_filename(flat, as_path=True,
                                         use_dask=use_dask).get_data()    
     elif ztfimg.CCD in flat.__class__.__mro__:

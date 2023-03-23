@@ -388,7 +388,10 @@ class FlatPipe( CalibPipe ):
                 
         datalist = self.init_datafile.copy()
 
-        bias = BiasPipe.from_period(*self.period)
+        ccd_OI = datalist.ccdid.unique() #CCD of interest
+        if ccd_OI.size == 16 : ccd_OI = None
+        
+        bias = BiasPipe.from_period(*self.period, ccdid=ccd_OI)
         bias_ccds = getattr(bias, "get_"+apply_period+"_ccd")(from_file=from_file, **kwargs)
         datalist = datalist.reset_index().set_index(["day", "ccdid", "ledid"])["index"] 
 
@@ -466,7 +469,7 @@ class FlatPipe( CalibPipe ):
             setattr(self, "_period_ccds", ccd_list)
             
         if normalize : 
-            self._normalize(apply_period="period")
+            self._normalize(apply_bias_period="period")
             
     def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True, apply_bias_period="daily", chunkreduction=None, use_dask=None, from_file=None, normalize=True,  bias_opt={}, **kwargs):
         """ Overloading of the build_daily_ccds
@@ -533,7 +536,11 @@ class FlatPipe( CalibPipe ):
                     chunkreduction=chunkreduction), 
                 **kwargs}
                
-            bias = BiasPipe.from_period(*self.period)
+            #Selecting CCD of interest
+            ccd_OI = self.init_datafile.ccdid.unique()
+            if ccd_OI.size == 16 : ccd_OI = None
+            
+            bias = BiasPipe.from_period(*self.period, ccdid=ccd_OI)
             bias_ccds = bias.get_daily_ccd(**bias_opt) #Hardcode dailies
 
             data_outs = []

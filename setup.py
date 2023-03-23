@@ -11,7 +11,7 @@ MAINTAINER_EMAIL = 'm.rigault@ipnl.in2p3.fr'
 URL = 'https://github.com/MickaelRigault/ztfin2p3'
 LICENSE = 'Apache 2.0'
 DOWNLOAD_URL = 'https://github.com/MickaelRigault/ztfin2p3'
-VERSION = '0.3.3'
+VERSION = '0.3.4'
 
 try:
     from setuptools import setup, find_packages

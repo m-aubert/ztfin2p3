@@ -388,10 +388,10 @@ class FlatPipe( CalibPipe ):
                 
         datalist = self.init_datafile.copy()
 
-        ccd_OI = datalist.ccdid.unique() #CCD of interest
-        if ccd_OI.size == 16 : ccd_OI = None
+        ccd_oi = datalist.ccdid.unique() #CCD of interest
+        if ccd_oi.size == 16 : ccd_oi = None
         
-        bias = BiasPipe.from_period(*self.period, ccdid=ccd_OI)
+        bias = BiasPipe.from_period(*self.period, ccdid=ccd_oi)
         bias_ccds = getattr(bias, "get_"+apply_period+"_ccd")(from_file=from_file, **kwargs)
         datalist = datalist.reset_index().set_index(["day", "ccdid", "ledid"])["index"] 
 
@@ -537,10 +537,10 @@ class FlatPipe( CalibPipe ):
                 **kwargs}
                
             #Selecting CCD of interest
-            ccd_OI = self.init_datafile.ccdid.unique()
-            if ccd_OI.size == 16 : ccd_OI = None
+            ccd_oi = self.init_datafile.ccdid.unique()
+            if ccd_oi.size == 16 : ccd_oi = None
             
-            bias = BiasPipe.from_period(*self.period, ccdid=ccd_OI)
+            bias = BiasPipe.from_period(*self.period, ccdid=ccd_oi)
             bias_ccds = bias.get_daily_ccd(**bias_opt) #Hardcode dailies
 
             data_outs = []

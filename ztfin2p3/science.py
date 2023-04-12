@@ -293,9 +293,9 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
 
     return new_headers
     
-def header_from_quadrantheader(header, skip=["CID", "CAL", "MAG", "CLRC", "ZP", "APCOR", 
-                                                     "FIXAPERS", "NMATCHES", "BIT", "HISTORY",
-                                                     "COMMENT"]):
+def header_from_quadrantheader(header, skip=["CID", "CAL", "CLRC", "APCOR", 
+                                                "FIXAPERS", "NMATCHES", "BIT", "HISTORY",
+                                                 "COMMENT"]):
     """ build the new header for a ztf-ipac pipeline science quadrant header
 
     Parameters

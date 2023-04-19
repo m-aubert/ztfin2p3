@@ -45,8 +45,12 @@ def get_refcatalog(ra, dec, radius, which, enrich=True):
     
     hmt_id = get_htm_intersect(ra, dec, radius, depth=7)
     dirpath = os.path.join(IN2P3_LOCATION, IN2P3_CATNAME[which])
-    cat = pandas.concat([Table.read(os.path.join(dirpath, f"{htm_id_}.fits"), format="fits").to_pandas()
-                            for htm_id_ in hmt_id]).reset_index(drop=True)
+    # all tables
+    tables = [Table.read(os.path.join(dirpath, f"{htm_id_}.fits"), format="fits") for htm_id_ in hmt_id]
+    # table.to_pandas() only accepts single-value columns.
+    t_ = tables[0] # test table 
+    ok_names = [name for name in t_.colnames if len(t_[name].shape) <= 1] # assume all tables have the same format.
+    cat = pandas.concat([t_[ok_names].to_pandas() for t_ in tables]).reset_index(drop=True)
     if enrich:
         # - ra, dec in degrees
         cat[["ra","dec"]] = cat[["coord_ra","coord_dec"]]*180/np.pi

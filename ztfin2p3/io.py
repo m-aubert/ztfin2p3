@@ -14,7 +14,6 @@ PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
 #  USED            #
 #                  #
 # ================ #
-
 def ipacfilename_to_ztfin2p3filepath(filename):
     """ convert an ipac-format filename into a filepath for the ztfin2p3 pipeline """
     kind = buildurl.filename_to_kind(filename)
@@ -30,9 +29,6 @@ def ipacfilename_to_ztfin2p3filepath(filename):
         raise NotImplementedError("only 'sci' object filename to filepath implemented")
         
     return filepath
-
-
-
 
 def get_flatfiles(date, filtername, ccdid=None):
     """ get the flat filepath for the given date and filtername
@@ -66,7 +62,6 @@ def get_flatfiles(date, filtername, ccdid=None):
     
     return filenames
 
-
 def get_biasfiles(date, ccdid=None):
     """ get the bias filepath for the given date
 
@@ -98,17 +93,20 @@ def get_biasfiles(date, ccdid=None):
 
 
 
+
+
+
+
+
+
+
+
+
 # ================ #
 #                  #
 #  To Be Checked   #
 #                  #
 # ================ #
-
-
-
-
-
-
 
 
 def get_config(which):
@@ -461,69 +459,127 @@ def get_sciencefile(yyyy, mm, dd, fracday, field, filtername, ccdid,
     filestructure = f"ztfin2p3_{yyyy:04d}{mm:02d}{dd:02d}{fracday:06d}_{field:06d}_{filtername}_c{ccdid:02d}_o_q{qid:1d}_{suffix}"
     return os.path.join(BASESOURCE, "sci", f"{yyyy:04d}",f"{mm:02d}{dd:02d}", f"{fracday:06d}",
                         filestructure)
-    
-#########################
-#                       #
-#                       #
-#    Catalogs           #
-#                       #
-#                       #
-#########################
-def get_ps1_catalog(ra, dec, radius, source="ccin2p3"):
+
+
+
+
+
+class CCIN2P3(object):
     """ """
-    if source in ["in2p3","ccin2p3","cc"]:
-        return get_catalog_from_ccin2p3(ra, dec, radius, "ps1")
-    
-    raise NotImplementedError("Only query to CC-IN2P3 implemented")
 
-def get_catalog_from_ccin2p3(ra, dec, radius, which, enrich=True):
-    """  fetch an catalog stored at the ccin2p3.
+    def __init__(self, auth=None, connect=True):
+        """ """
+        if self.running_at_cc:
+            self._connected = True
+        else:
+            self.load_ssh(auth=auth)
+            self._connected = False
+            if connect:
+                self.connect(auth=auth)
+        self.logger = logging.getLogger(__name__)
 
-    Parameters
-    ----------
-    ra, dec: float
-        central point coordinates in decimal degrees or sexagesimal
-    
-    radius: float
-        radius of circle in degrees
+    def load_ssh(self, auth=None):
+        from paramiko import SSHClient
 
-    which: str
-        Name of the catalog:
-        - ps1
-        - gaia_dr2
-        - sdss
-    
-    enrich: bool
-        IN2P3 catalog have ra,dec coordinates stored in radian
-        as coord_ra/dec and flux in nJy
-        Shall this add the ra, dec keys coords (in deg) in degree and the magnitude ?
+        self._auth = auth
+        self._ssh = SSHClient()
+        self._ssh.load_system_host_keys()
 
-    Returns
-    -------
-    DataFrame
-    """
-    from .utils.tools import get_htm_intersect, njy_to_mag
-    from astropy.table import Table
-    IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/"
-    IN2P3_CATNAME = {"ps1":"ps1_pv3_3pi_20170110",
-                     "gaia_dr2":"gaia_dr2_20190808",
-                     "sdss":"sdss-dr9-fink-v5b"}
-    
-    if which not in IN2P3_CATNAME:
-        raise NotImplementedError(f" Only {list(IN2P3_CATNAME.keys())} CC-IN2P3 catalogs implemented ; {which} given")
-    
-    hmt_id = get_htm_intersect(ra, dec, radius, depth=7)
-    dirpath = os.path.join(IN2P3_LOCATION, IN2P3_CATNAME[which])
-    cat = pandas.concat([Table.read(os.path.join(dirpath, f"{htm_id_}.fits"), format="fits").to_pandas()
-                            for htm_id_ in hmt_id]).reset_index(drop=True)
-    if enrich:
-        # - ra, dec in degrees
-        cat[["ra","dec"]] = cat[["coord_ra","coord_dec"]]*180/np.pi
-        # - mags
-        fluxcol = [col for col in  cat.columns if col.endswith("_flux")]
-        fluxcolerr = [col for col in  cat.columns if col.endswith("_fluxErr")]
-        magcol = [col.replace("_flux","_mag") for col in fluxcol]
-        magcolerr = [col.replace("_flux","_mag") for col in fluxcolerr]
-        cat[magcol], cat[magcolerr] = njy_to_mag(cat[fluxcol].values,cat[fluxcolerr].values)
-        
-    return cat
+    def connect(self, auth=None):
+        """ """
+        if auth is None:
+            auth = _load_id_("ccin2p3")
+
+        username, password = auth
+        try:
+            self._ssh.connect("cca.in2p3.fr", username=username, password=password)
+        except:
+            raise IOError("Cannot connect to cca.in2p3.fr with given authentification")
+
+        self._connected = True
+
+    @classmethod
+    def scp(cls, fromfile, tofile, auth=None):
+        """ """
+        if fromfile.startswith(CCIN2P3_SOURCE):
+            method = "scp_get"
+        elif tofile.startswith(CCIN2P3_SOURCE):
+            method = "scp_put"
+        else:
+            raise ValueError(
+                f"None of fromfile or tofile stars with {CCIN2P3_SOURCE}. Cannot use scp(), see scp_get or scp_put"
+            )
+
+        this = cls(auth=auth, connect=True)
+        return getattr(this, method)(fromfile, tofile)
+
+    def scp_get(self, remotefile, localfile, auth=None, overwrite=False):
+        """ """
+        from scp import SCPClient
+
+        if not self._connected:
+            self.connect(auth)
+
+        directory = os.path.dirname(localfile)
+        oldmask = os.umask(0o002)
+
+        if not os.path.exists(directory):
+            self.logger.debug(f"scp_get(): creating {directory}")
+
+            os.makedirs(directory, exist_ok=True)
+
+        with SCPClient(self.ssh.get_transport()) as scp:
+            scp.get(remotefile, localfile)
+
+    def scp_put(self, localfile, remotefile, auth=None):
+        """ """
+        from scp import SCPClient
+
+        if not self._connected:
+            self.connect(auth)
+
+        with SCPClient(self.ssh.get_transport()) as scp:
+            scp.put(localfile, remotefile)
+
+    def query_catalog(self, ra, dec, radius, catname="gaia", depth=7, **kwargs):
+        """query catalog ; works only when logged at the CCIN2P3"""
+        if not self.running_at_cc:
+            raise IOError("Only works if running from the ccin2p3")
+
+        import os
+        from htmcatalog import htmquery
+
+        LSST_REFCAT_DIR = "/sps/lsst/datasets/refcats/htm/v1"
+        KNOW_REFCAT = {
+            "gaiadr1": "gaia_DR1_v1",
+            "gaiadr2": "gaia_dr2_20190808",
+            "ps1dr1": "ps1_pv3_3pi_20170110",
+            "sdssdr9": "sdss-dr9-fink-v5b",
+        }
+        KNOW_REFCAT["gaia"] = KNOW_REFCAT["gaiadr2"]
+        KNOW_REFCAT["ps1"] = KNOW_REFCAT["ps1dr1"]
+        if catname not in KNOW_REFCAT:
+            raise ValueError(
+                f"unknown catalog {catname}. Aviability: "
+                + ", ".join(list(KNOW_REFCAT.keys()))
+            )
+
+        hq = htmquery.HTMQuery(
+            depth, os.path.join(LSST_REFCAT_DIR, KNOW_REFCAT[catname])
+        )
+        return hq.fetch_cat(ra, dec, radius, **kwargs)
+
+    # ============= #
+    #  Properties   #
+    # ============= #
+    @property
+    def ssh(self):
+        """ """
+        return self._ssh
+
+    @property
+    def running_at_cc(self):
+        """ """
+        hostname = os.uname()[1]
+        return "cca" in hostname or "ccwige" in hostname
+

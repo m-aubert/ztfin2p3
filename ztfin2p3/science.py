@@ -16,9 +16,10 @@ from .io import ipacfilename_to_ztfin2p3filepath
 
 
 def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs):
-    """ give a list of individual raw-cdds with their 
-    corresponding flat and bias ccds.
+    """ Top level method to process multiple images.
     
+    Parameters
+    ----------
     rawfiles: str
         filenames or filepaths of the ccd images a raw image.
 
@@ -62,9 +63,12 @@ def build_science_image(rawfile, flat, bias,
                             corr_nl=True,
                             corr_overscan=True,
                             overwrite=True):
-    """ Top level method to build a science image.
+    """ Top level method to build a single processed image.
 
-    = dask not implemented yet =
+    It calls:
+    - to get the data: build_science_data()
+    - to get the header: build_science_headers()
+    - to store those: store_science_image()
 
     Parameter
     ---------
@@ -141,57 +145,20 @@ def build_science_image(rawfile, flat, bias,
 
     return outs
 
-def store_science_image(new_data, new_headers, new_filenames,
-                        use_dask=False,
-                        overwrite=True):
-    """ store data in the input filename. 
-    
-    this method handles dask.
-
-    Parameters
-    ----------
-    new_data: list
-        list of 2d-array (quadrant format) | numpy or dask
-
-    new_header: list
-        list of header (or delayed)
-
-    new_filenames: list 
-        list of full path where the data shall be stored.
-    
-    use_dask: bool
-        shall this use dask while storing.
-        careful if this is false while data are dask.array
-        this will compute them.
-
-    Returns
-    -------
-    list
-        return of individual writeto.
-    
-    """
-    outs = []
-    for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
-        # make sure the directory exists.        
-        os.makedirs( os.path.dirname(file_), exist_ok=True)
-        # writing data.
-        if use_dask:
-            out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
-        else:
-            out = fits.writeto(file_, data_, header=header_, overwrite=overwrite)
-            
-        outs.append(out)
-        
-    return outs
-
-
+# ------------- # 
+#  mid-level    #
+# ------------- #
 def build_science_data(rawfile,
                       flat, bias,
                       dask_level=None, 
                       corr_nl=True,
                       corr_overscan=True,
                       as_path=True):
-    """ 
+    """ build a single processed image data
+
+    The function corrects for the sensor effects going from 
+    raw to "science" images.
+    
     Parameters
     ----------
     rawfile: str
@@ -226,6 +193,7 @@ def build_science_data(rawfile,
     ----------
     list
        list of the 2 quadrant data. 
+
     """
     use_dask = dask_level is not None
     # Generic I/O for flat and bias
@@ -276,7 +244,6 @@ def build_science_data(rawfile,
     new_data = sciccd.get_quadrantdata(from_data=True, reorder=False) # q1, q2, q3, q4
     return new_data
 
-
 def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
     """ """
     if ipac_filepaths:
@@ -292,7 +259,53 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
         new_headers.append(header_from_quadrantheader(header))
 
     return new_headers
+
+def store_science_image(new_data, new_headers, new_filenames,
+                        use_dask=False,
+                        overwrite=True):
+    """ store data in the input filename. 
     
+    this method handles dask.
+
+    Parameters
+    ----------
+    new_data: list
+        list of 2d-array (quadrant format) | numpy or dask
+
+    new_header: list
+        list of header (or delayed)
+
+    new_filenames: list 
+        list of full path where the data shall be stored.
+    
+    use_dask: bool
+        shall this use dask while storing.
+        careful if this is false while data are dask.array
+        this will compute them.
+
+    Returns
+    -------
+    list
+        return of individual writeto.
+    
+    """
+    outs = []
+    for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
+        # make sure the directory exists.        
+        os.makedirs( os.path.dirname(file_), exist_ok=True)
+        # writing data.
+        if use_dask:
+            out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
+        else:
+            out = fits.writeto(file_, data_, header=header_, overwrite=overwrite)
+            
+        outs.append(out)
+        
+    return outs
+
+# ------------- # 
+#  low-level    #
+# ------------- #
 def header_from_quadrantheader(header, skip=["CID", "CAL", "CLRC", "APCOR", 
                                                 "FIXAPERS", "NMATCHES", "BIT", "HISTORY",
                                                  "COMMENT"]):

@@ -1,5 +1,9 @@
 """ module to handle catalog in the ztfin2p3 pipeline """
 
+import os
+import pandas
+import numpy as np
+
 IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/"
 IN2P3_CATNAME = {"ps1":"ps1_pv3_3pi_20170110",
                  "gaia_dr2":"gaia_dr2_20190808",

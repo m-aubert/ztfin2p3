@@ -16,26 +16,26 @@ _KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
                                'phot_rp_mean_fluxErr', 'coord_raErr', 'coord_decErr', 'epoch',
                                'pm_ra', 'pm_dec', 'pm_raErr', 'pm_decErr', 'parallax', 'parallaxErr',
                                'astrometric_excess_noise'],
-
+                  "ps1": ['id', 'coord_ra', 'coord_dec', 'parent', 'g_flux', 'r_flux', 'i_flux',
+                          'z_flux', 'y_flux', 'i_fluxErr', 'y_fluxErr', 'r_fluxErr', 'z_fluxErr',
+                          'g_fluxErr', 'coord_ra_err', 'coord_dec_err', 'epoch', 'pm_ra',
+                          'pm_dec', 'pm_ra_err', 'pm_dec_err'],
+                  "sdss":['id', 'coord_ra', 'coord_dec', 'parent', 'U_flux', 'G_flux', 'R_flux',
+                          'I_flux', 'Z_flux', 'I_fluxErr', 'R_fluxErr', 'Z_fluxErr', 'U_fluxErr',
+                          'G_fluxErr']
                   }
 
-_KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
-                               'phot_g_mean_flux','phot_bp_mean_flux', 'phot_rp_mean_flux' ,
-                               'phot_g_mean_fluxErr', 'phot_bp_mean_fluxErr',
-                               'phot_rp_mean_fluxErr', 'coord_raErr', 'coord_decErr', 'epoch',
-                               'pm_ra', 'pm_dec', 'pm_raErr', 'pm_decErr', 'parallax', 'parallaxErr',
-                               'astrometric_excess_noise'],
-
-                  }
 
 def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwargs):
-    """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given 
+    """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given a
     ztfimg image. 
 
     Parameters
     ----------
-    img: ztfimg.Image
-       a ztfimg.Image.
+    img: ztfimg.Image, dask.delayed
+       a ztfimg.Image. dask is supported either if
+       ztfimg.Image.use_dask is True or 
+       if ztfimg.Image is delayed.
     
     which: str
         Name of the catalog. 
@@ -68,17 +68,17 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
             raise NotImplementedError(f"{which} has no predefined column names. Needed when dasked img.")
         
         colnames = _KNOWN_COLUMNS[which]
+        # cat delayed
+        cat_delayed = dask.delayed(get_refcatalog)(ra_dec[0], ra_dec[1],
+                                                    radius=radius,
+                                                    which=which, enrich=enrich,
+                                                    colnames=colnames,
+                                                       **kwargs) # catalog
         if enrich:
             colnames += ["ra", "dec"]
             colnames += [col.replace("_flux","_mag") for col in colnames
                              if col.endswith("_flux") or col.endswith("_fluxErr")]
 
-        # cat delayed
-        cat_delayed = dask.delayed(catalog.get_refcatalog)(ra_dec[0], ra_dec[1],
-                                                            radius=radius,
-                                                            which=which, enrich=enrich,
-                                                            colnames=colnames,
-                                                            **kwargs) # catalog
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
 

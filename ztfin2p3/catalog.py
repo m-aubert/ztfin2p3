@@ -56,7 +56,7 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     use_dask = ("dask" in str(type(img))) or img.use_dask
     if not use_dask:
         ra, dec = img.get_center("radec") # centroid of the image
-        cat = catalog.get_refcatalog(ra, dec, radius=radius,
+        cat = get_refcatalog(ra, dec, radius=radius,
                                      which=which, enrich=enrich,
                                      **kwargs) # catalog
     else:

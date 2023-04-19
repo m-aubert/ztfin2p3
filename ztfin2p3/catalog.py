@@ -19,6 +19,15 @@ _KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
 
                   }
 
+_KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
+                               'phot_g_mean_flux','phot_bp_mean_flux', 'phot_rp_mean_flux' ,
+                               'phot_g_mean_fluxErr', 'phot_bp_mean_fluxErr',
+                               'phot_rp_mean_fluxErr', 'coord_raErr', 'coord_decErr', 'epoch',
+                               'pm_ra', 'pm_dec', 'pm_raErr', 'pm_decErr', 'parallax', 'parallaxErr',
+                               'astrometric_excess_noise'],
+
+                  }
+
 def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwargs):
     """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given 
     ztfimg image. 
@@ -70,7 +79,7 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
                                                             which=which, enrich=enrich,
                                                             colnames=colnames,
                                                             **kwargs) # catalog
-        meta = pandas.DataFrame(columns=colnames, dtypes="float32")
+        meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
 
     cat = img._xy_to_catalog_(cat, in_fov=in_fov) # this handles dask.

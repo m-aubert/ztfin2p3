@@ -72,8 +72,9 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     if which not in _KNOWN_COLUMNS:
         colnames = None
     else:
-        colnames = _KNOWN_COLUMNS[which].copy()    
-        print("using colnames")
+        colnames = _KNOWN_COLUMNS[which].copy()
+
+    print(f"using colnames {colnames}")
     if not use_dask:
         ra, dec = img.get_center("radec") # centroid of the image
         cat = get_refcatalog(ra, dec, radius=radius,

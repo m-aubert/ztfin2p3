@@ -1,4 +1,18 @@
-""" module to handle catalog in the ztfin2p3 pipeline """
+""" module to handle catalog in the ztfin2p3 pipeline 
+
+
+
+Usage
+-----
+import ztfimg
+from ztfin2p3 import catalog
+
+filename = "ztf_20190331168461_700500_zg_c13_o_q2_sciimg.fits"
+# set use_dask if access to dask cluster.
+sci = ztfimg.ScienceQuadrant.from_filename(filename, as_path=False, use_dask=False)
+cat = catalog.get_img_refcatalog(sci, "gaia_dr2")
+# if sci is delayed or use_dask cat will be a dask.dataframe
+"""
 
 import os
 import pandas
@@ -54,20 +68,23 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     pandas.DataFrame
     """
     use_dask = ("dask" in str(type(img))) or img.use_dask
+    
+    if which not in _KNOWN_COLUMNS:
+        colnames = None
+    else:
+        colnames = _KNOWN_COLUMNS[which].copy()    
+        print("using colnames")
     if not use_dask:
         ra, dec = img.get_center("radec") # centroid of the image
         cat = get_refcatalog(ra, dec, radius=radius,
-                                     which=which, enrich=enrich,
-                                     **kwargs) # catalog
+                                 which=which, enrich=enrich,
+                                 colnames=colnames,
+                                 **kwargs) # catalog
     else:
         import dask
         import dask.dataframe as dd
         ra_dec = dask.delayed(img.get_center)("radec") # centroid of the image
         # columns
-        if which not in _KNOWN_COLUMNS:
-            raise NotImplementedError(f"{which} has no predefined column names. Needed when dasked img.")
-        
-        colnames = _KNOWN_COLUMNS[which]
         # cat delayed
         cat_delayed = dask.delayed(get_refcatalog)(ra_dec[0], ra_dec[1],
                                                     radius=radius,
@@ -78,12 +95,13 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
             colnames += ["ra", "dec"]
             colnames += [col.replace("_flux","_mag") for col in colnames
                              if col.endswith("_flux") or col.endswith("_fluxErr")]
-
+        
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
 
     cat = img._xy_to_catalog_(cat, in_fov=in_fov) # this handles dask.
     return cat
+
 
 def get_refcatalog(ra, dec, radius, which, enrich=True, colnames=None):
     """ fetch an lsst refcats catalog stored at the cc-in2p3.

@@ -170,7 +170,7 @@ def build_science_data(rawfile,
         ccd: ccd object containing the data
         array: numpy or dask array
 
-    dask_level: None, "shallow", "medium", "deep"
+    dask_level: None, "medium", "deep"
         should this use dask and how ?
         - None: dask not used.
         - medium: delayed at the `from_filename` level

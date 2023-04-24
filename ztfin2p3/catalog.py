@@ -67,8 +67,10 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     -------
     pandas.DataFrame
     """
-    use_dask = ("dask" in str(type(img))) or img.use_dask
-    
+    # dasked ?
+    is_delayed = ("dask" in str( type(img)) )
+    use_dask = is_delayed or img.use_dask
+
     if which not in _KNOWN_COLUMNS:
         colnames = None
     else:
@@ -95,11 +97,20 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
             colnames += ["ra", "dec"]
             colnames += [col.replace("_flux","_mag") for col in colnames
                              if col.endswith("_flux") or col.endswith("_fluxErr")]
-        
+
+        if not is_delayed: # delayed is made after the xy_added
+            meta = pandas.DataFrame(columns=colnames, dtype="float32")
+            cat = dd.from_delayed(cat_delayed, meta=meta)
+
+    # adding x,y position to catalog
+    if is_delayed:
+        cat_delayed = img.add_xy_to_catalog(cat_delayed, in_fov=in_fov)
+        colnames += ["x", "y"]
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
-
-    cat = img.add_xy_to_catalog(cat, in_fov=in_fov) # this handles dask.
+    else: # work for both no dask or img.use_dask=True
+        img.add_xy_to_catalog(cat, in_fov=in_fov)
+        
     return cat
 
 

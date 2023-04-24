@@ -74,7 +74,6 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     else:
         colnames = _KNOWN_COLUMNS[which].copy()
 
-    print(f"using colnames {colnames}")
     if not use_dask:
         ra, dec = img.get_center("radec") # centroid of the image
         cat = get_refcatalog(ra, dec, radius=radius,
@@ -100,7 +99,7 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
 
-    cat = img._xy_to_catalog_(cat, in_fov=in_fov) # this handles dask.
+    cat = img.add_xy_to_catalog(cat, in_fov=in_fov) # this handles dask.
     return cat
 
 

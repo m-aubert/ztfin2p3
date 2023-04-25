@@ -110,7 +110,7 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
         cat = dd.from_delayed(cat_delayed, meta=meta)
         
     else: # work for both no dask or img.use_dask=True
-        img.add_xy_to_catalog(cat, in_fov=in_fov)
+        cat = img.add_xy_to_catalog(cat, in_fov=in_fov)
         
     return cat
 

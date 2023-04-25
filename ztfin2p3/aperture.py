@@ -1,6 +1,6 @@
 """ Module to run the aperture photometry """
 
-
+import os
 import numpy as np
 import ztfimg
 from ztfimg.catalog import get_isolated

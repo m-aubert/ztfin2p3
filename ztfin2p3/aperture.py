@@ -1,5 +1,6 @@
 """ Module to run the aperture photometry """
 
+
 import numpy as np
 import ztfimg
 from ztfimg.catalog import get_isolated
@@ -91,7 +92,11 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         
     if type(cat) is str:
         if minimal_columns:
-            columns = _MINIMAL_COLNAMES[cat]
+            if cat in _MINIMAL_COLNAMES:
+                columns = _MINIMAL_COLNAMES[cat]
+            else:
+                warnings.warn(f"no minimal columns implemented for {cat}")
+                columns = None                
         else:
             columns = None
             

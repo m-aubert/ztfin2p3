@@ -7,9 +7,9 @@ from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 
 
-_MINIMAL_COLNAMES = {"gaia_dr2": ['index', 'id','ra', 'dec',
+_MINIMAL_COLNAMES = {"gaia_dr2": ['id','ra', 'dec',
                                   'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
-                                  'x', 'y', 'isolated']}
+                                  'x', 'y']} # index and isolated comes after
 
 def get_aperture_photometry(sciimg, cat="gaia_dr2", 
                                 dask_level="deep", as_path=True,

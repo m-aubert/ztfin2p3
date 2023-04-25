@@ -5,7 +5,14 @@ import ztfimg
 from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 
-def get_aperture_photometry(sciimg, cat="gaia_dr2", dask_level="deep", as_path=True,
+
+_MINIMAL_COLNAMES = {"gaia_dr2": ['index', 'id','ra', 'dec',
+                                  'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
+                                  'x', 'y', 'isolated']}
+
+def get_aperture_photometry(sciimg, cat="gaia_dr2", 
+                                dask_level="deep", as_path=True,
+                                minimal_columns=True,
                                 seplimit=20,
                                 radius=np.linspace(2,10,9),
                                 bkgann=[10,11], 
@@ -34,7 +41,14 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2", dask_level="deep", as_path=T
         ** WARNING dask_level='medium' & joined=True may failed due to serialization issues **
 
     as_path: bool
+        = ignored if sciimg is not a str =
         Set to True if the filename are path and not just ztf filename.
+
+    minimal_columns: bool
+        = ignored if cat is not a str =
+        should this use the minimal catalog entry columns 
+        as defined in catalog.get_refcatalog ?
+        
     
     seplimit: float
         separation in arcsec to define the (self-) isolation
@@ -76,7 +90,14 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2", dask_level="deep", as_path=T
             raise ValueError(f"Cannot parse dask_level {dask_level} | medium or deep accepted.")
         
     if type(cat) is str:
+        if minimal_columns:
+            columns = _MINIMAL_COLNAMES[cat]
+        else:
+            columns = None
+            
         cat = get_img_refcatalog(sciimg, cat) # this handles dask.
+        if columns is not None: #
+            cat = cat[columns]
 
     if "isolated" not in cat:
         # add to cat the (self-)isolation information
@@ -113,3 +134,15 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2", dask_level="deep", as_path=T
 
     return ap_dataframe
 
+def store_aperture_catalog(cat, new_filenames):
+    """ store the given catalog into the new filename """
+    # Comments for developpers:
+    # a function might be a bit too much just for this
+    # but it sets the structure for more complexe storage
+    # if we want to at some point.
+    dirname = os.path.dirname(new_filename)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname, exist_ok=True)
+    
+    cat.to_parquet(new_filename)
+    

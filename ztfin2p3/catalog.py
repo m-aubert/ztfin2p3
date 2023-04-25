@@ -40,7 +40,8 @@ _KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
                   }
 
 
-def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwargs):
+def get_img_refcatalog(img, which, radius=0.7, in_fov=True,
+                           enrich=True, **kwargs):
     """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given a
     ztfimg image. 
 
@@ -61,7 +62,7 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     radius: float
         radius of circle in degrees
 
-    **kwargs goes to get_refcatalog
+    **kwargs goes to get_refcatalog (columns etc.)
 
     Returns
     -------
@@ -115,7 +116,8 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True, enrich=True, **kwarg
     return cat
 
 
-def get_refcatalog(ra, dec, radius, which, enrich=True, colnames=None):
+def get_refcatalog(ra, dec, radius, which, enrich=True,
+                       colnames=None):
     """ fetch an lsst refcats catalog stored at the cc-in2p3.
 
     Parameters

@@ -14,10 +14,27 @@ PACKAGE_PATH = os.path.dirname(os.path.realpath(__file__))
 #  USED            #
 #                  #
 # ================ #
-def ipacfilename_to_ztfin2p3filepath(filename):
-    """ convert an ipac-format filename into a filepath for the ztfin2p3 pipeline """
+def ipacfilename_to_ztfin2p3filepath(filename, new_suffix=None, new_extension=None):
+    """ convert an ipac-format filename into a filepath for the ztfin2p3 pipeline 
+
+    Parameters
+    ----------
+    filename: str
+        ipac path or ztf-filename
+
+    new_suffix: None, str
+        if given this replace the filename suffix (element after the last '_')
+
+    new_extension: None, str
+        change the filename extension. 
+
+    Returns
+    -------
+    str
+        fullpath for the new filename (ztfin2p3 format)
+    """
     kind = buildurl.filename_to_kind(filename)
-    # Science
+    # File structure
     if kind == "sci":
         ipac_filepath = buildurl.filename_to_url(filename, source="local")
         # new filename. Replace:
@@ -27,7 +44,22 @@ def ipacfilename_to_ztfin2p3filepath(filename):
         
     else:
         raise NotImplementedError("only 'sci' object filename to filepath implemented")
+
+    # update extension or suffix
+    if new_extension is not None or new_suffix is not None:
+        filepath_, file_extension = os.path.splitext(filepath)
+        # new suffix
+        if new_suffix is not None:
+            *l_, suffix = filepath_.split("_")
+            filepath_ = "_".join(l_+[new_suffix])
         
+        # new extension
+        if not new_extension.startswith("."): 
+            new_extension = f".{new_extension}"
+            
+        # new filename
+        filepath = f"{filepath_}{new_extension}"
+
     return filepath
 
 def get_flatfiles(date, filtername, ccdid=None):

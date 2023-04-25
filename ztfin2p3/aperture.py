@@ -228,8 +228,11 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
 
     return ap_dataframe
 
-def store_aperture_catalog(cat, new_filenames):
-    """ store the given catalog into the new filename """
+def store_aperture_catalog(cat, new_filename, **kwargs):
+    """ store the given catalog into the new filename 
+    
+    **kwargs goes to pandas.DataFrame.to_parquet
+    """
     # Comments for developpers:
     # a function might be a bit too much just for this
     # but it sets the structure for more complexe storage
@@ -238,6 +241,6 @@ def store_aperture_catalog(cat, new_filenames):
     if not os.path.isdir(dirname):
         os.makedirs(dirname, exist_ok=True)
     
-    out = cat.to_parquet(new_filename)
+    out = cat.to_parquet(new_filename, **kwargs)
     return out
     

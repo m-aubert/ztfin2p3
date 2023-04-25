@@ -5,12 +5,102 @@ import numpy as np
 import ztfimg
 from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
-
+from .io import ipacfilename_to_ztfin2p3filepath
 
 _MINIMAL_COLNAMES = {"gaia_dr2": ['id','ra', 'dec',
                                   'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
                                   'x', 'y']} # index and isolated comes after
 
+
+def bulk_aperture_photometry(filenames, cat="gaia_dr2",
+                                dask_level="shallow",
+                                radius=np.linspace(2,10,9), bkgann=[10,11],
+                                as_path=True, **kwargs):
+    """ run aperture photometry on science images
+
+    
+    """
+    filenames = np.atleast_1d(filenames) # make
+
+    prop = {**dict(cat=cat,
+                    dask_level=dask_level,
+                    radius=radius, bkgann=bkgann,
+                    as_path=as_path), **kwargs}
+        
+    # bulk running apeture photometry
+    delayed_or_not = [build_aperture_photometry(filename, **prop) for filename in filanemes]
+    return delayed_or_not
+
+def build_aperture_photometry(filename, cat="gaia_dr2",
+                                dask_level="shallow",
+                                radius=np.linspace(2,10,9), bkgann=[10,11],
+                                as_path=True, **kwargs):
+    """ run and store aperture photometry on a signle science image
+
+    Parameters
+    ----------
+    filename: str
+        name or path (see as_patjh) of a science image to run the aperture photometry on.
+    
+    cat: str, DataFrame
+       catalog to use for the aperture photometry.
+        - str: name of a catalog accessible from get_img_refcatalog
+        - DataFrame:  actual catalog that contains ra, dec information.
+            could be pandas or dask
+    
+    dask_level: None, str
+        = ignored if sciimg is not a str =
+        should this use dask and how ?
+        - None: dask not used.
+        - shallow: delayed at the top level (get_aperture_photometry etc)
+        - medium: delayed at the `from_filename` level | careful: could be unsable
+        - deep: dasked at the array level (native ztimg)
+ 
+    radius: float, array
+        aperture photometry radius (could be 1d-list).
+        In unit of pixels. 
+        To broadcast, this has [:,None] applied to internally.
+        
+    bkgann: list
+        properties of the annulus [min, max] (in unit of pixels).
+        This should broadcast with radius the broadcasted radius.
+
+    as_path: bool
+        = ignored if sciimg is not a str =
+        Set to True if the filename are path and not just ztf filename.
+
+    **kwargs goes to get_aperture_photometry (seplimit, minimal_columns ...)
+
+    Returns
+    -------
+    delayed or None
+        output of store_aperture_catalog.
+    """
+    output_filename = ipacfilename_to_ztfin2p3filepath(filename,
+                                                       new_suffix="apcat",
+                                                       new_extension="parquet")
+
+    prop_apcat = {**dict(cat=cat,
+                            radius=radius, bkgann=bkgann,
+                             as_path=as_path),
+                  **kwargs}
+    
+    if dask_level == "shallow": # dasking at the top level method
+        import dask
+        # build the catalog
+        apcat = dask.delayed(get_aperture_photometry)(filename, dask_level=None, **prop_apcat)
+        # and store it
+        out = dask.delayed(store_aperture_catalog)(apcat, output_filename)
+    else:
+        apcat = get_aperture_photometry(filename, dask_level=dask_level, **prop_apcat)
+        out = store_aperture_catalog(apcat, output_filename)
+
+    return out
+    
+            
+# ------------- # 
+#  mid-level    #
+# ------------- #    
 def get_aperture_photometry(sciimg, cat="gaia_dr2", 
                                 dask_level="deep", as_path=True,
                                 minimal_columns=True,
@@ -18,7 +108,7 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                 radius=np.linspace(2,10,9),
                                 bkgann=[10,11], 
                                 joined=True):
-    """ run the aperture photometry on science image given input catalog.
+    """ run  aperture photometry on science image given input catalog.
     
     Parameters
     ----------
@@ -50,7 +140,6 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         should this use the minimal catalog entry columns 
         as defined in catalog.get_refcatalog ?
         
-    
     seplimit: float
         separation in arcsec to define the (self-) isolation
  
@@ -149,5 +238,6 @@ def store_aperture_catalog(cat, new_filenames):
     if not os.path.isdir(dirname):
         os.makedirs(dirname, exist_ok=True)
     
-    cat.to_parquet(new_filename)
+    out = cat.to_parquet(new_filename)
+    return out
     

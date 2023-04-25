@@ -66,12 +66,12 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2", dask_level="deep", as_path=T
     if type(sciimg) is str:
         # dasking (or not) `ztfimg.ScienceQuadrant.from_filename`
         if not use_dask:
-            sciimg = ztfimg.ScienceQuadrant.from_filename(filename, as_path=as_path)
+            sciimg = ztfimg.ScienceQuadrant.from_filename(sciimg, as_path=as_path)
         elif dask_level == "deep": # dasking inside ztfimg
-            sciimg = ztfimg.ScienceQuadrant.from_filename(filename, as_path=as_path, 
+            sciimg = ztfimg.ScienceQuadrant.from_filename(sciimg, as_path=as_path, 
                                                           use_dask=True)
         elif dask_level == "medium": # dasking outside ztfimg
-            sciimg = dask.delayed(ztfimg.ScienceQuadrant.from_filename)(filename, as_path=as_path)
+            sciimg = dask.delayed(ztfimg.ScienceQuadrant.from_filename)(sciimg, as_path=as_path)
         else:
             raise ValueError(f"Cannot parse dask_level {dask_level} | medium or deep accepted.")
         

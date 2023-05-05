@@ -295,13 +295,20 @@ def store_science_image(new_data, new_headers, new_filenames,
         os.makedirs( os.path.dirname(file_), exist_ok=True)
         # writing data.
         if use_dask:
-            out = dask.delayed(fits.writeto)(file_, data_, header=header_, overwrite=overwrite)
+            out = dask.delayed(_store_fits_)(filename=file_, data=data_, header=header_, overwrite=overwrite)
         else:
-            out = fits.writeto(file_, data_, header=header_, overwrite=overwrite)
+            out = _store_fits_(filename=file_, data=data_, header=header_, overwrite=overwrite)
             
         outs.append(out)
         
     return outs
+
+def _store_fits_(filename, data, header=None, overwrite=False, **kwargs):
+    """ simple fits.writeto that returns the filename """
+    fits.writeto(filename, filename, header=header, overwrite=overwrite, **kwargs)
+    return filename
+
+    
 
 # ------------- # 
 #  low-level    #

@@ -28,11 +28,12 @@ def bulk_aperture_photometry(filenames, cat="gaia_dr2",
                     as_path=as_path), **kwargs}
         
     # bulk running apeture photometry
-    delayed_or_not = [build_aperture_photometry(filename, **prop) for filename in filanemes]
+    delayed_or_not = [build_aperture_photometry(str(filename), **prop) for filename in filenames]
     return delayed_or_not
 
+
 def build_aperture_photometry(filename, cat="gaia_dr2",
-                                dask_level="shallow",
+                                dask_level=None,
                                 radius=np.linspace(2,10,9), bkgann=[10,11],
                                 as_path=True, **kwargs):
     """ run and store aperture photometry on a signle science image
@@ -76,7 +77,7 @@ def build_aperture_photometry(filename, cat="gaia_dr2",
     delayed or None
         output of store_aperture_catalog.
     """
-    output_filename = ipacfilename_to_ztfin2p3filepath(filename,
+    output_filename = aperture.ipacfilename_to_ztfin2p3filepath(filename,
                                                        new_suffix="apcat",
                                                        new_extension="parquet")
 
@@ -88,13 +89,13 @@ def build_aperture_photometry(filename, cat="gaia_dr2",
     if dask_level == "shallow": # dasking at the top level method
         import dask
         # build the catalog
-        apcat = dask.delayed(get_aperture_photometry)(filename, dask_level=None, **prop_apcat)
+        apcat = dask.delayed(aperture.get_aperture_photometry)(filename, dask_level=None, **prop_apcat)
         # and store it
-        out = dask.delayed(store_aperture_catalog)(apcat, output_filename)
+        out = dask.delayed(aperture.store_aperture_catalog)(apcat, output_filename)
     else:
-        apcat = get_aperture_photometry(filename, dask_level=dask_level, **prop_apcat)
-        out = store_aperture_catalog(apcat, output_filename)
-
+        apcat = aperture.get_aperture_photometry(filename, dask_level=dask_level, **prop_apcat)
+        out = aperture.store_aperture_catalog(apcat, output_filename)
+        
     return out
     
             
@@ -102,7 +103,7 @@ def build_aperture_photometry(filename, cat="gaia_dr2",
 #  mid-level    #
 # ------------- #    
 def get_aperture_photometry(sciimg, cat="gaia_dr2", 
-                                dask_level="deep", as_path=True,
+                                dask_level=None, as_path=True,
                                 minimal_columns=True,
                                 seplimit=20,
                                 radius=np.linspace(2,10,9),

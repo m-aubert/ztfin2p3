@@ -305,7 +305,7 @@ def store_science_image(new_data, new_headers, new_filenames,
 
 def _store_fits_(filename, data, header=None, overwrite=False, **kwargs):
     """ simple fits.writeto that returns the filename """
-    fits.writeto(filename, filename, header=header, overwrite=overwrite, **kwargs)
+    fits.writeto(filename, data, header=header, overwrite=overwrite, **kwargs)
     return filename
 
     

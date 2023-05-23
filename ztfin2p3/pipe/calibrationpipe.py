@@ -46,9 +46,9 @@ class FlatPipe( CalibPipe ):
         -------
         str
             fullpath
-
         """
-        return super().get_fileout(ccdid, ledid=ledid, filtername=filtername, day=day, periodicity=periodicity)
+        return super().get_fileout(ccdid, ledid=ledid, filtername=filtername,
+                                    day=day, periodicity=periodicity)
 
     # ----------------- #
     #  High-Level build #
@@ -304,7 +304,8 @@ class FlatPipe( CalibPipe ):
                                                         ccdids=x["ccdid"], **kwargs), 
                                  axis=1)
     
-    def get_period_ccd(self, rebuild=False, ccdid=None,ledid=None, filtername=None, **kwargs):
+    def get_period_ccd(self, rebuild=False, ccdid=None, ledid=None,
+                        filtername=None, **kwargs):
         """ get a serie of ztfimg.CCD object for each requested ccdid.
         
         Parameters
@@ -405,7 +406,10 @@ class FlatPipe( CalibPipe ):
         return ccd_list
  
 
-    def build_period_ccds(self,corr_overscan=True, corr_nl=True, corr_bias=False, chunkreduction=2, use_dask=None, _groupbyk=["ccdid", "ledid"], from_file=False, normalize=False, bias_opt={}, **kwargs):
+    def build_period_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=False,
+                              chunkreduction=2, use_dask=None,
+                              _groupbyk=["ccdid", "ledid"], from_file=False,
+                              normalize=False, bias_opt={}, **kwargs):
         
         """ Overloading of the build_period_ccds
         loads the period CalibrationBuilder based on the loaded daily_ccds.
@@ -449,7 +453,10 @@ class FlatPipe( CalibPipe ):
         """
         
         if not from_file : 
-            super().build_period_ccds(corr_overscan=corr_overscan, corr_nl=corr_nl, chunkreduction=chunkreduction, use_dask=use_dask, _groupbyk=_groupbyk, from_file=from_file, **kwargs)
+            super().build_period_ccds(corr_overscan=corr_overscan, corr_nl=corr_nl,
+                                        chunkreduction=chunkreduction, use_dask=use_dask,
+                                        _groupbyk=_groupbyk, from_file=from_file,
+                                        **kwargs)
             
         else : 
             datalist = self.init_datafile.copy()
@@ -471,7 +478,10 @@ class FlatPipe( CalibPipe ):
         if normalize : 
             self._normalize(apply_bias_period="period")
             
-    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True, apply_bias_period="daily", chunkreduction=None, use_dask=None, from_file=None, normalize=True,  bias_opt={}, **kwargs):
+    def build_daily_ccds(self, corr_overscan=True, corr_nl=True, corr_bias=True,
+                             apply_bias_period="daily", chunkreduction=None,
+                             use_dask=None, from_file=None, normalize=True,
+                             bias_opt={}, **kwargs):
         """ Overloading of the build_daily_ccds
         loads the daily CalibrationBuilder based on init_datafile.
 
@@ -843,7 +853,10 @@ class FlatPipe( CalibPipe ):
         if not hasattr(self, '_filter_ccds'):
             raise AttributeError("_filter_ccds not available. run 'build_filter_ccds'")
         return self._filter_ccds
-        
+
+
+
+
 class BiasPipe( CalibPipe ):
     _KIND = "bias"
 

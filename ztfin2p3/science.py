@@ -113,6 +113,21 @@ def build_science_image(rawfile, flat, bias,
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
     new_filenames = [ipacfilename_to_ztfin2p3filepath(f) for f in ipac_filepaths]
     
+    #-- patch
+    if prefix is not None : 
+        new_filenames = [f.replace('ztfin2p3', 
+                                   'ztf-'+prefix) for f in new_filenames]
+    
+    # Here avoid to do all the computation to not do the work in the end. 
+    # Especially if all quadrants files are created.
+    if not overwrite : 
+        outs = new_filenames
+        do =  sum([os.path.isfile(newfile) for newfile in new_filenames])
+        if do == 4 : 
+            if dask_level == 'shallow': 
+                outs = dask.delayed(outs)  #Weird thing to keep consistent
+        
+            return outs
     
     if dask_level == "shallow": # dasking at the top level method
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
@@ -252,13 +267,21 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
     new_headers = []
     for sciimg_ in ipac_filepaths:
         if use_dask:
-            header = dask.delayed(fits.getheader)(sciimg_)
+            header = dask.delayed(exception_header)(sciimg_)#dask.delayed(fits.getheader)(sciimg_)
         else:
-            header = fits.getheader(sciimg_)
+            header = exception_header(sciimg_) #fits.getheader(sciimg_)
             
         new_headers.append(header_from_quadrantheader(header))
 
     return new_headers
+
+def exception_header(file_):
+    try : 
+        hdr=fits.getheader(file_)
+        return hdr
+    except Exception as e : 
+        warnings.warn(str(e))
+        return None
 
 def store_science_image(new_data, new_headers, new_filenames,
                         use_dask=False,

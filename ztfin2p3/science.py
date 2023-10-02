@@ -62,7 +62,8 @@ def build_science_image(rawfile, flat, bias,
                             dask_level=None, 
                             corr_nl=True,
                             corr_overscan=True,
-                            overwrite=True):
+                            overwrite=True,
+                            prefix=None):
     """ Top level method to build a single processed image.
 
     It calls:
@@ -116,7 +117,7 @@ def build_science_image(rawfile, flat, bias,
     #-- patch
     if prefix is not None : 
         new_filenames = [f.replace('ztfin2p3', 
-                                   'ztf-'+prefix) for f in new_filenames]
+                                   'ztf-'+prefix+'_') for f in new_filenames]
     
     # Here avoid to do all the computation to not do the work in the end. 
     # Especially if all quadrants files are created.
@@ -133,10 +134,10 @@ def build_science_image(rawfile, flat, bias,
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
                                                         dask_level=None,
                                                         corr_nl=corr_nl,
-                                                        corr_overscan=corr_overscan)
+                                                corr_overscan=corr_overscan)
     
         new_header = dask.delayed(build_science_headers)(rawfile,
-                                                            ipac_filepaths=ipac_filepaths,
+                                                         ipac_filepaths=ipac_filepaths,
                                                             use_dask=False)
     
         # note that filenames are not delayed even if dasked.
@@ -268,10 +269,12 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
     for sciimg_ in ipac_filepaths:
         if use_dask:
             header = dask.delayed(exception_header)(sciimg_)#dask.delayed(fits.getheader)(sciimg_)
+            new_headers.append(header_from_quadrantheader(header))
+
         else:
             header = exception_header(sciimg_) #fits.getheader(sciimg_)
-            
-        new_headers.append(header_from_quadrantheader(header))
+            new_headers.append(header)
+
 
     return new_headers
 
@@ -285,7 +288,7 @@ def exception_header(file_):
 
 def store_science_image(new_data, new_headers, new_filenames,
                         use_dask=False,
-                        overwrite=True):
+                        overwrite=True, noneheader=False):
     """ store data in the input filename. 
     
     this method handles dask.
@@ -314,16 +317,21 @@ def store_science_image(new_data, new_headers, new_filenames,
     """
     outs = []
     for data_, header_, file_  in zip(new_data, new_headers, new_filenames):
+        if header_ is None and not noneheader : 
+            continue
+        
         # make sure the directory exists.        
         os.makedirs( os.path.dirname(file_), exist_ok=True)
         # writing data.
         if use_dask:
-            out = dask.delayed(_store_fits_)(filename=file_, data=data_, header=header_, overwrite=overwrite)
+            out = dask.delayed(_store_fits_)(filename=file_, data=data_, 
+                                             header=header_, overwrite=overwrite)
         else:
-            out = _store_fits_(filename=file_, data=data_, header=header_, overwrite=overwrite)
-            
+            out = _store_fits_(filename=file_, data=data_, 
+                               header=header_, overwrite=overwrite)
+
         outs.append(out)
-        
+
     return outs
 
 def _store_fits_(filename, data, header=None, overwrite=False, **kwargs):
@@ -359,17 +367,20 @@ def header_from_quadrantheader(header, skip=["CID", "CAL", "CLRC", "APCOR",
     if "dask" in str( type(header) ):
         return dask.delayed(header_from_quadrantheader)(header, skip=skip)
 
-
+    
     newheader = fits.Header()
-    for k in header.keys() :
-        if np.any([k.startswith(key_) for key_ in skip]):
-            continue
-            
-        try:
-            newheader.set(k, header[k], header.comments[k])
-        except:
-            warnings.warn(f"header transfert failed for {k}")
-            
+
+    if header is not None : 
+
+        for k in header.keys() :
+            if np.any([k.startswith(key_) for key_ in skip]):
+                continue
+
+            try:
+                newheader.set(k, header[k], header.comments[k])
+            except:
+                warnings.warn(f"header transfert failed for {k}")
+        
     newheader.set("PIPELINE", "ZTFIN2P3", "image processing pipeline")
     newheader.set("PIPEV", __version__, "ztfin2p3 pipeline version")
     newheader.set("ZTFIMGV", ztfimg.__version__, "ztfimg pipeline version")

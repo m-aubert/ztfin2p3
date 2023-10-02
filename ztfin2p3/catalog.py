@@ -18,7 +18,8 @@ import os
 import pandas
 import numpy as np
 
-IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/"
+IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/" 
+#"/sps/lsst/datasets/refcats/htm/v1/"
 IN2P3_CATNAME = {"ps1":"ps1_pv3_3pi_20170110",
                  "gaia_dr2":"gaia_dr2_20190808",
                  "sdss":"sdss-dr9-fink-v5b"}
@@ -40,7 +41,7 @@ _KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
                   }
 
 
-def get_img_refcatalog(img, which, radius=0.7, in_fov=True,
+def get_img_refcatalog(img, which, coord='xy', radius=0.7, in_fov=True,
                            enrich=True, **kwargs):
     """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given a
     ztfimg image. 
@@ -58,6 +59,11 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True,
         - ps1 (pv3_3pi_20170110)
         - gaia_dr2 (20190808)
         - sdss (dr9-fink-v5b)
+        
+    coord : str
+        Coordinate system to add to aperture catalogue. 
+        'ij' : ccd
+        'xy' : quadrant
 
     radius: float
         radius of circle in degrees
@@ -105,13 +111,13 @@ def get_img_refcatalog(img, which, radius=0.7, in_fov=True,
 
     # adding x,y position to catalog
     if is_delayed:
-        cat_delayed = img.add_xy_to_catalog(cat_delayed, in_fov=in_fov)
-        colnames += ["x", "y"]
+        cat_delayed = img.add_coord_to_catalog(cat_delayed, coord=coord, in_fov=in_fov)
+        colnames += [coord[0] , coord[1]] #["x", "y"]
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
         
     else: # work for both no dask or img.use_dask=True
-        cat = img.add_xy_to_catalog(cat, in_fov=in_fov)
+        cat = img.add_coord_to_catalog(cat, coord=coord , in_fov=in_fov)
         
     return cat
 

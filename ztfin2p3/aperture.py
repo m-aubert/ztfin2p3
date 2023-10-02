@@ -6,6 +6,7 @@ import ztfimg
 from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 from .io import ipacfilename_to_ztfin2p3filepath
+import warnings
 
 _MINIMAL_COLNAMES = {"gaia_dr2": ['id','ra', 'dec',
                                   'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
@@ -35,7 +36,7 @@ def bulk_aperture_photometry(filenames, cat="gaia_dr2",
 def build_aperture_photometry(filename, cat="gaia_dr2",
                                 dask_level=None,
                                 radius=np.linspace(2,10,9), bkgann=[10,11],
-                                as_path=True, **kwargs):
+                                as_path=True, new_suffix="apcat", **kwargs):
     """ run and store aperture photometry on a signle science image
 
     Parameters
@@ -77,8 +78,8 @@ def build_aperture_photometry(filename, cat="gaia_dr2",
     delayed or None
         output of store_aperture_catalog.
     """
-    output_filename = aperture.ipacfilename_to_ztfin2p3filepath(filename,
-                                                       new_suffix="apcat",
+    output_filename = ipacfilename_to_ztfin2p3filepath(filename,
+                                                       new_suffix=new_suffix,
                                                        new_extension="parquet")
 
     prop_apcat = {**dict(cat=cat,
@@ -89,12 +90,12 @@ def build_aperture_photometry(filename, cat="gaia_dr2",
     if dask_level == "shallow": # dasking at the top level method
         import dask
         # build the catalog
-        apcat = dask.delayed(aperture.get_aperture_photometry)(filename, dask_level=None, **prop_apcat)
+        apcat = dask.delayed(get_aperture_photometry)(filename, dask_level=None, **prop_apcat)
         # and store it
-        out = dask.delayed(aperture.store_aperture_catalog)(apcat, output_filename)
+        out = dask.delayed(store_aperture_catalog)(apcat, output_filename)
     else:
-        apcat = aperture.get_aperture_photometry(filename, dask_level=dask_level, **prop_apcat)
-        out = aperture.store_aperture_catalog(apcat, output_filename)
+        apcat = get_aperture_photometry(filename, dask_level=dask_level, **prop_apcat)
+        out = store_aperture_catalog(apcat, output_filename)
         
     return out
     
@@ -108,7 +109,8 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                 seplimit=20,
                                 radius=np.linspace(2,10,9),
                                 bkgann=[10,11], 
-                                joined=True):
+                                joined=True,
+                                refcat_radius=0.7):
     """ run  aperture photometry on science image given input catalog.
     
     Parameters
@@ -180,6 +182,13 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         else:
             raise ValueError(f"Cannot parse dask_level {dask_level} | medium or deep accepted.")
         
+    if 'CCD' in str(type(sciimg)) :
+        coord = 'ij'
+        rm_bkgd = 'quadrant'
+    else : 
+        coord = 'xy'
+        rm_bkgd=True
+        
     if type(cat) is str:
         if minimal_columns:
             if cat in _MINIMAL_COLNAMES:
@@ -190,8 +199,10 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         else:
             columns = None
             
-        cat = get_img_refcatalog(sciimg, cat) # this handles dask.
+        cat = get_img_refcatalog(sciimg, cat, coord=coord, radius=refcat_radius) # this handles dask.
         if columns is not None: #
+            if coord == 'ij' : 
+                columns = columns[:-2]+['i','j']
             cat = cat[columns]
 
     if "isolated" not in cat:
@@ -199,14 +210,14 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         cat = cat.join( get_isolated(cat, seplimit=seplimit) ) # this handles dask.
         
     # data
-    data = sciimg.get_data(apply_mask=True, rm_bkgd=True) # cleaned image
+    data = sciimg.get_data(apply_mask=True, rm_bkgd=rm_bkgd) # cleaned image
     mask = sciimg.get_mask()
     err = sciimg.get_noise("rms")
 
     # run aperture
     radius = np.atleast_1d(radius)[:,None] # broadcasting
-    x = cat["x"].values
-    y = cat["y"].values
+    x = cat[coord[0]].values
+    y = cat[coord[1]].values
     ap_dataframe = sciimg.get_aperture(x, y, 
                                         radius=radius,
                                         bkgann=bkgann,

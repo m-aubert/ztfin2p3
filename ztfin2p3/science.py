@@ -62,8 +62,7 @@ def build_science_image(rawfile, flat, bias,
                             dask_level=None, 
                             corr_nl=True,
                             corr_overscan=True,
-                            overwrite=True,
-                            prefix=None):
+                            overwrite=True):
     """ Top level method to build a single processed image.
 
     It calls:
@@ -114,11 +113,7 @@ def build_science_image(rawfile, flat, bias,
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
     new_filenames = [ipacfilename_to_ztfin2p3filepath(f) for f in ipac_filepaths]
     
-    #-- patch
-    if prefix is not None : 
-        new_filenames = [f.replace('ztfin2p3', 
-                                   'ztf-'+prefix+'_') for f in new_filenames]
-    
+    # Patch
     # Here avoid to do all the computation to not do the work in the end. 
     # Especially if all quadrants files are created.
     if not overwrite : 

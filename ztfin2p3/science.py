@@ -62,7 +62,7 @@ def build_science_image(rawfile, flat, bias,
                             dask_level=None, 
                             corr_nl=True,
                             corr_overscan=True,
-                            overwrite=True):
+                            overwrite=True, **kwargs):
     """ Top level method to build a single processed image.
 
     It calls:
@@ -129,7 +129,7 @@ def build_science_image(rawfile, flat, bias,
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
                                                         dask_level=None,
                                                         corr_nl=corr_nl,
-                                                corr_overscan=corr_overscan)
+                                                corr_overscan=corr_overscan, **kwargs)
     
         new_header = dask.delayed(build_science_headers)(rawfile,
                                                          ipac_filepaths=ipac_filepaths,
@@ -143,7 +143,7 @@ def build_science_image(rawfile, flat, bias,
         new_data = build_science_data(rawfile, flat, bias,
                                           dask_level=dask_level,
                                           corr_nl=corr_nl,
-                                          corr_overscan=corr_overscan)
+                                          corr_overscan=corr_overscan, **kwargs)
     
         new_header = build_science_headers(rawfile,
                                             ipac_filepaths=ipac_filepaths,
@@ -164,7 +164,7 @@ def build_science_data(rawfile,
                       dask_level=None, 
                       corr_nl=True,
                       corr_overscan=True,
-                      as_path=True):
+                      as_path=True, **kwargs):
     """ build a single processed image data
 
     The function corrects for the sensor effects going from 
@@ -211,8 +211,10 @@ def build_science_data(rawfile,
     if type(flat) is str:
         flat = ztfimg.CCD.from_filename(flat, as_path=True,
                                         use_dask=use_dask).get_data()    
+
     elif ztfimg.CCD in flat.__class__.__mro__:
         flat = flat.get_data()
+
     elif not "array" in str( type(flat) ): # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
     
@@ -241,7 +243,7 @@ def build_science_data(rawfile,
     
     # Step 2. Create new data, header, filename -------- #
     # new science data
-    calib_data = rawccd.get_data(corr_nl=corr_nl, corr_overscan=corr_overscan)
+    calib_data = rawccd.get_data(corr_nl=corr_nl, corr_overscan=corr_overscan, **kwargs)
     if dask_level == "medium": # calib_data is a 'delayed'.
         calib_data = dask.array.from_delayed(calib_data, dtype="float32", 
                                              shape=ztfimg.RawCCD.SHAPE)

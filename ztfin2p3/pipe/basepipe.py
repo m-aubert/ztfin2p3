@@ -123,7 +123,7 @@ class CalibPipe( BasePipe ):
                         use_dask=another_cls.use_dask, skip=skip, **kwargs)
 
             
-        this._init_datafile #Instantiate
+        this.init_datafile #Instantiate
         
         #Create mask from info from another_cls 
         #taking into account ccdid and date

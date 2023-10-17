@@ -289,22 +289,12 @@ class CalibrationBuilder( object ): # /day /week /month
         return to_fits(fileout, data, header=header, overwrite=overwrite)
 
     @staticmethod
-    def build_from_data(datas, corr_nl=True, corr_overscan=True,
-                  set_it=False, incl_header=False,
-                  header_keys=None, chunkreduction=2,
-                  dask_on_header=False, **kwargs):
+    def build_from_data(datas,
+                  set_it=False, chunkreduction=2,**kwargs):
         """ build the mean data.
 
         Parameters
         ----------
-        corr_nl: bool
-            Should data be corrected for non-linearity
-
-        corr_overscan: bool
-            Should the data be corrected for overscan
-            (if both corr_overscan and corr_nl are true,
-            corr_nl is applied first)
-
         chunkreduction: int
             rechunk and split of the image.
             If None, no rechunk
@@ -339,8 +329,7 @@ class CalibrationBuilder( object ): # /day /week /month
         
         # This could be updated in the calibration function #
         
-        prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
-                       chunkreduction=chunkreduction),
+        prop = {**dict(chunkreduction=chunkreduction),
                 **kwargs}
                     
         return get_meandata(datas, **prop)
@@ -349,7 +338,7 @@ class CalibrationBuilder( object ): # /day /week /month
     def build(self, corr_nl=True, corr_overscan=True,
                   set_it=False, incl_header=False,
                   header_keys=None, chunkreduction=2,
-                  dask_on_header=False, **kwargs):
+                  dask_on_header=False, get_data_props={}, **kwargs):
         """ build the mean data.
 
         Parameters
@@ -395,13 +384,11 @@ class CalibrationBuilder( object ): # /day /week /month
         """
         
         # This could be updated in the calibration function #
-        
-        #prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl,
-        #               chunkreduction=chunkreduction),
-        #        **kwargs}
             
-        data =self.imgcollection.get_data(**dict(corr_overscan=corr_overscan, corr_nl=corr_nl))
-        data = get_meandata(data,chunkreduction=chunkreduction, **kwargs) #self.imgcollection.get_meandata(**prop)
+        data =self.imgcollection.get_data(**dict(corr_overscan=corr_overscan, corr_nl=corr_nl), **get_data_props)
+        
+        data = get_meandata(data,chunkreduction=chunkreduction, **kwargs) 
+        
         if incl_header:
             header = self.build_header(keys=header_keys,
                                        use_dask=dask_on_header)
@@ -418,7 +405,7 @@ class CalibrationBuilder( object ): # /day /week /month
     def build_with_corr(self, corr_nl=True, corr_overscan=True,
                   corr = None, set_it=False, incl_header=False,
                   header_keys=None, chunkreduction=2,
-                  dask_on_header=False, **kwargs):
+                  dask_on_header=False, get_data_props={}, **kwargs):
         """ build the mean data.
 
         Parameters
@@ -469,9 +456,9 @@ class CalibrationBuilder( object ): # /day /week /month
             return self.build(corr_nl=corr_nl, corr_overscan=corr_overscan,
                   set_it=set_it, incl_header=incl_header,
                   header_keys=header_keys, chunkreduction=2,
-                  dask_on_header=dask_on_header, **kwargs)
+                  dask_on_header=dask_on_header,  get_data_props={},**kwargs)
                     
-        prop_data = dict(corr_overscan=corr_overscan, corr_nl=corr_nl)
+        prop_data = {**get_data_props, **dict(corr_overscan=corr_overscan, corr_nl=corr_nl)}
         prop = {**dict(chunkreduction=chunkreduction),  **kwargs}
         
         if incl_header:
@@ -480,7 +467,7 @@ class CalibrationBuilder( object ): # /day /week /month
         else:
             header = None
             
-        data = self.imgcollection.get_data(**prop_data) - corr        
+        data = self.imgcollection.get_data(**prop_data) - corr  
         data = get_meandata(data,**prop)
                    
         if set_it:
@@ -583,12 +570,37 @@ class CalibrationBuilder( object ): # /day /week /month
         """ test if the header has been set. False means no """
         return self.header is not None
 
+    
+
+#General purpose function calling class from above. 
+#Easier to delay and works better with dask for reasons
+def calib_from_filenames(filenames,use_dask=False, **kwargs): 
+    fbuilder = CalibrationBuilder.from_filenames(filenames,
+                                                 use_dask=use_dask,
+                                                 raw=True,
+                                                 as_path=True,
+                                                 persist=False)
+    calibdata = fbuilder.build(**kwargs)[0]
+    return calibdata 
+
+
+
+#General purpose function calling class from above. 
+#Easier to delay and works better with dask for reasons
+def calib_from_filenames_withcorr(filenames,use_dask=False, corr=None, **kwargs): 
+    fbuilder = CalibrationBuilder.from_filenames(filenames,
+                                                 use_dask=use_dask,
+                                                 raw=True,
+                                                 as_path=True,
+                                                 persist=False)
+    calibdata = fbuilder.build_with_corr(corr=corr, **kwargs)[0]
+    return calibdata 
 
     
 def get_meandata(datas, axis=0,
                          chunkreduction=2,
-                         weights=1,  sigma_clip=None, mergedhow="mean", clipping_prop={},
-                         **kwargs):
+                         weights=None,  sigma_clip=None, mergedhow="mean", clipping_prop={},
+                         ):
         """ get a the mean 2d-array of the images [nimages, N, M]->[N, M]
 
         Parameters
@@ -615,7 +627,6 @@ def get_meandata(datas, axis=0,
         clipping_prop: dict
             kwargs entering scipy.stats.sigma_clip()
 
-        **kwargs goes to self.get_data()
 
         Returns
         -------

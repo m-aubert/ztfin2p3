@@ -8,6 +8,9 @@ from astropy.io import fits
 import os
 import ztfimg 
 import dask
+import warnings
+from .. import __version__
+
 
 class BasePipe( object ):
     _KIND = "_base_"
@@ -85,8 +88,52 @@ class CalibPipe( BasePipe ):
         else : 
             this.init_datafile #Instantiate
             this._init_datafile["filepath"] = this.init_datafile["filepath"].map(lambda x: x[skip:]) 
+            # Fix patch in case whacky data acquisition (e.g only 1 bias file)
+            # This requires at least two bias data for the pipeline to run "smoothly"
+            # Is not ideal. Should issue a warning. Should extend that to the no-skipping as well.
+            this._init_datafile['len'] = this._init_datafile.filepath.map(len)
+            mask = this._init_datafile['len'] > 2
+            if np.sum(~mask) > 0: 
+                warnings.warn('Days with less than two raw images were removed.')
+            
+            this._init_datafile = this._init_datafile[mask].reset_index()
+            this._init_datafile = this._init_datafile.drop(columns=["len", 'index'])
+            
             return this
             
+    #To do: 
+    @classmethod
+    def from_pipe(cls, another_cls, skip=None, **kwargs):
+        """ 
+        This function instantiate from a different pipeline instance. 
+        It copies the init_datafile days and ccdid 
+        
+        Parameters
+        ----------
+        another_cls : 
+            An instantiated class of CalibPipe type (Flat or Bias) 
+            
+        **kwargs :
+            kwargs passed to the ztfin2p3.metadata.get_rawmeta()
+            
+        """
+                
+        
+        this = cls.from_period(*another_cls.period, 
+                        use_dask=another_cls.use_dask, skip=skip, **kwargs)
+
+            
+        this.init_datafile #Instantiate
+        
+        #Create mask from info from another_cls 
+        #taking into account ccdid and date
+        mask = (this.init_datafile.day.isin(another_cls.init_datafile.day) &
+                this.init_datafile.ccdid.isin(another_cls.init_datafile.ccdid))
+        
+        df = this.init_datafile[mask].reset_index().drop(columns=['index'])
+        this._init_datafile = df.copy()
+        
+        return this
     
     # ============== #
     #   Methods      #
@@ -141,7 +188,7 @@ class CalibPipe( BasePipe ):
     #  I/O functions    #
     # ----------------- # 
     
-    def store_ccds(self, periodicity="period", fits_kwargs = {}, **kwargs):
+    def store_ccds(self, periodicity="period", fits_kwargs = {}, incl_header=False, **kwargs):
         """
         Function to store created period_ccds
         
@@ -178,22 +225,25 @@ class CalibPipe( BasePipe ):
             datalist = datalist.reset_index()
 
         pdata = getattr(self, periodicity+'_ccds')
-
+        
+        if incl_header : 
+            hdata = self.build_headers(periodicity=periodicity)
+        else : 
+            hdata = [None]*len(pdata)
+            
         outs = []
         if "dask" in str(type(pdata[0])): 
+                        
             for i , row in datalist.iterrows() : 
                     fileout = self.get_fileout(ccdid=row.ccdid, 
                                                periodicity=periodicity, 
                                                day=row.day)
                     
+                    
                     data = pdata[row['index']].compute() 
-                    out = self._to_fits(fileout, data, **fits_kwargs)
+                    out = self._to_fits(fileout, data, header=hdata[row['index']] , **fits_kwargs)
                     outs.append(out)
-                    #Compute iteratively for low memory management. 
-                    #Check if delaying the compute call might work 
-                    #(that is compute remotely on worker then save)
-                    #. TBD.
-                
+                    
         else : 
             for i,row in datalist.iterrows() : 
                 fileout = self.get_fileout(ccdid=row.ccdid, 
@@ -201,12 +251,13 @@ class CalibPipe( BasePipe ):
                                             day=row.day,)
                                             
                 data = pdata[row['index']]
-                out = self._to_fits(fileout, data, **kwargs)
+                out = self._to_fits(fileout, data, header=hdata[row['index']]  **kwargs)
                 outs.append(out)
                 
         return outs
     
-    def _to_fits(self, fileout, data, header=None, overwrite=True, **kwargs):
+    @staticmethod
+    def _to_fits(fileout, data, header=None, overwrite=True, **kwargs):
         """ Store the data in fits format 
 
         Parameters
@@ -288,11 +339,14 @@ class CalibPipe( BasePipe ):
             ccdid = np.atleast_1d(ccdid)
             datalist = datalist[datalist["ccdid"].isin(ccdid)]
 
-        ids = datalist.reset_index().groupby(["ccdid"]).last().index.sort_values() 
-
-        ccds_im = [ztfimg.CCD.from_data(self.period_ccds[i-1]) for i in ids]
+        #ids = datalist.reset_index().groupby(["ccdid"]).last().index.sort_values() 
+        #ids = datalist.groupby(["ccdid"]).last().reset_index().reset_index().set_index('ccdid')
         
-        ccds = pandas.Series(data=ccds_im, dtype="object", index=ids)
+        ids = datalist.groupby(["ccdid"]).last().reset_index()
+        
+        ccds_im = [ztfimg.CCD.from_data(self.period_ccds[i]) for i in ids.index]
+        
+        ccds = pandas.Series(data=ccds_im, dtype="object", index=ids.set_index('ccdid').index)
 
         return ccds
                   
@@ -509,22 +563,11 @@ class CalibPipe( BasePipe ):
     #   Structural      #
     # ----------------- #
     
-    def build_period_ccds(self,corr_overscan=False, corr_nl=False, chunkreduction=None, rebuild=False, use_dask=None, from_file=None, daily_ccds_opts={}, _groupbyk="ccdid", **kwargs):
+    def build_period_ccds(self,chunkreduction=None, rebuild=False, use_dask=None, from_file=None, daily_ccds_opts={}, _groupbyk="ccdid", **kwargs):
         """ loads the period CalibrationBuilder based on the computed daily_ccds.
 
         Parameters
         ----------
-        corr_overscan: bool
-            Should the data be corrected for overscan
-            (if both corr_overscan and corr_nl are true, 
-            nl is applied first)
-
-        corr_nl: bool
-            Should data be corrected for non-linearity
-        
-        corr_bias : bool
-            Should data be corrected for master bias
-
         chunkreduction: int or None
             rechunk and split of the image.
             If None, no rechunk
@@ -564,8 +607,7 @@ class CalibPipe( BasePipe ):
             datalist = self.init_datafile.copy()
             ccds_dailycol= datalist.reset_index().groupby(_groupbyk).index.apply(list) 
 
-            prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
-                        chunkreduction=chunkreduction, incl_header=False), 
+            prop = {**dict(chunkreduction=chunkreduction), 
                     **kwargs}
 
             calib_from_data = CalibrationBuilder.build_from_data
@@ -590,14 +632,80 @@ class CalibPipe( BasePipe ):
             
         else : 
             
-            ccdlist = self.init_datafile.ccdid.unique()
+            datalist = self.init_datafile.copy()
+            ids = datalist.reset_index().groupby(["ccdid"]).last().index.sort_values() 
             
             data_outs = []
-            for ccdid in ccdlist : 
-                data = self._from_fits(self.get_fileout(ccdid=val), use_dask=use_dask)
+            for ccdid in ids : 
+                data = self._from_fits(self.get_fileout(ccdid=ccdid), use_dask=use_dask)
                 data_outs.append(data)
 
-            self._period_ccds =data_outs
+            self._period_ccds = data_outs
+            
+            
+    def build_headers(self,periodicity='period'):
+        """
+        
+        periodicity : str, default "period"
+            Define periodicity of header. 
+            "period"
+            "daily"
+            "daily_filter"
+            "filter"
+        """
+        
+        datalist = self.init_datafile.copy()
+        
+        if periodicity == 'period' : 
+            _groupbyk = ['ccdid']
+            datalist = datalist.reset_index().groupby(_groupbyk)
+            datalist = datalist.agg({'day' :  lambda x : len(list(x)) , 
+                                     'filepath' : lambda x : np.concatenate(np.asarray(list(x), dtype=str), 
+                                                                            axis=None).size}).reset_index()
+            
+            datalist = datalist.reset_index()
+            
+        else : 
+            _groupbyk = ['day','ccdid']
+            datalist = datalist.reset_index()
+            datalist['filepath'] = datalist.filepath.apply(len)
+            datalist['day']=1
+            
+        
+        headers= []
+        for i , row in datalist.iterrows() : 
+            hdr = self.build_single_header(NFRAMES= row.filepath, 
+                                     NDAYS  = row.day,
+                                     PTYPE = periodicity,
+                                     PERIOD = ' to '.join(self.period),
+                                     CCDID = row.ccdid)
+            
+            headers.append(hdr)
+        
+        return headers
+        #setattr(self, '_'+periodicity+'_headers', headers)            
+            
+
+    def build_single_header(self,**kwargs):
+        """
+        Generic func
+        """
+        from astropy.io import fits
+        import datetime
+        
+        header_dict = {**kwargs}
+        
+        hdr = fits.Header()
+        hdr['IMGTYPE'] = self.pipekind
+        
+        _ = [hdr.set(k, attr) for k,attr in header_dict.items()]
+                        
+        hdr.set("PIPELINE", "ZTFIN2P3", "image processing pipeline")
+        hdr.set("PIPEV", __version__, "ztfin2p3 pipeline version")
+        hdr.set("ZTFIMGV", ztfimg.__version__, "ztfimg pipeline version")
+        hdr.set("PIPETIME", datetime.datetime.now().isoformat(), "ztfin2p3 file creation")
+        
+        return hdr
 
     def get_init_datafile(self):
         """ """
@@ -656,12 +764,17 @@ class CalibPipe( BasePipe ):
                 use_dask = False
                 print("no dask")
         
-        if not from_file :         
+        if not from_file :      
+            from ..builder import calib_from_filenames
             # function 
-            calib_from_filename = CalibrationBuilder.from_filenames
+            #calib_from_filename = CalibrationBuilder.from_filenames
+            
+            
             if use_dask:
-                import dask
-                calib_from_filename = dask.delayed(calib_from_filename)
+                calib_from_filenames = dask.delayed(calib_from_filenames)
+                #import dask
+                #calib_from_filename = dask.delayed(calib_from_filename,
+                #                                   pure=False)
 
             prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
                         chunkreduction=chunkreduction), 
@@ -671,15 +784,16 @@ class CalibPipe( BasePipe ):
             data_outs = []
             for i_, s_ in self.init_datafile.iterrows():
                 filesin = s_["filepath"]
-                fbuilder = calib_from_filename(filesin,
-                                               raw=True, as_path=True,
-                                               persist=False,
-                                               use_dask=use_dask)
-                data = fbuilder.build(**prop)[0]
+                #fbuilder = calib_from_filename(filesin,
+                #                               raw=True, as_path=True,
+                #                               persist=False,
+                #                               use_dask=use_dask)
+                #data = fbuilder.build(**prop)[0]
+                data = calib_from_filenames(filesin, use_dask=use_dask, **prop) 
                 data_outs.append(data)
 
             if use_dask:
-                data_outs = dask.delayed(list)(data_outs).compute()
+                data_outs = list(dask.compute(*data_outs))
 
             self._daily_ccds = data_outs
             
@@ -691,7 +805,7 @@ class CalibPipe( BasePipe ):
                 file_in = self.get_fileout(row.ccdid, 
                                            periodicity="daily",
                                            day=row.day)
-                ccd = ztfimg.CCD.from_filename(file_in, use_dask=use_dask ) 
+                ccd = ztfimg.CCD.from_filename(file_in, use_dask=use_dask) 
                 data_outs.append(ccd.get_data(**kwargs))
             
             self._daily_ccds = data_outs

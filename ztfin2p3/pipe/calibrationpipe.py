@@ -495,9 +495,9 @@ class FlatPipe( CalibPipe ):
                             
     def build_daily_ccds(self, corr_overscan=True, corr_nl=True, 
                          corr_bias=True, apply_bias_period="daily", 
-                         bias_data='period', chunkreduction=None, 
+                         bias_data='daily', chunkreduction=None, 
                          use_dask=None, from_file=None, 
-                         normalize=True,  bias_opt={}, **kwargs):
+                         normalize=True,  bias_opt={}, bias=None, **kwargs):
         
         """ Overloading of the build_daily_ccds
         loads the daily CalibrationBuilder based on init_datafile.
@@ -559,7 +559,7 @@ class FlatPipe( CalibPipe ):
                     use_dask = True
                 except:
                     use_dask = False
-                    print("no dask")
+
             else :
                 import dask
                 
@@ -578,13 +578,17 @@ class FlatPipe( CalibPipe ):
             # -- Bias section
             # This part will need rewrite somewhere down the line
             #Selecting CCD of inteterest if any
-            ccd_oi = self.init_datafile.ccdid.unique()
-            if ccd_oi.size == 16 : ccd_oi = None
-            skip=bias_opt.pop('skip', None)
+            if bias is None:
+                ccd_oi = self.init_datafile.ccdid.unique()
+                if ccd_oi.size == 16 : ccd_oi = None
+                skip=bias_opt.pop('skip', None)
+
+                bias = BiasPipe.from_pipe(self, ccdid=ccd_oi, skip=skip)
+                bias_ccds = getattr(bias, 'get_'+bias_data+'_ccd')(**bias_opt) 
             
-            bias = BiasPipe.from_pipe(self, ccdid=ccd_oi, skip=skip)
-            bias_ccds = getattr(bias, 'get_'+bias_data+'_ccd')(**bias_opt) 
-            
+            else : 
+                bias_ccds = getattr(bias, 'get_'+bias_data+'_ccd')(**bias_opt) 
+
             # -- End Bias section
             
             data_outs = []
@@ -721,9 +725,7 @@ class FlatPipe( CalibPipe ):
                                       weights=weights[i[1]], axis=axis)
             period_filters.append(ccdicol)
             period_filters_norm.append(ccdidcol_norm)
-            
-        print('THIS IS DEBUG :', i[1])
-        
+                    
         self._filter_ccds = npda.stack(period_filters, axis=0)
         self.filter_ccds_norm = npda.stack(period_filters_norm, axis=0)
             
@@ -740,6 +742,7 @@ class FlatPipe( CalibPipe ):
         """
         
         datalist = self.init_datafile.copy()
+        periodicityk = periodicity
         
         if periodicity == 'period' : 
             _groupbyk = ['ccdid', 'ledid']
@@ -764,7 +767,7 @@ class FlatPipe( CalibPipe ):
             datalist['ledid'] = None
             
             periodicity="period" #Reset periodicity
-                
+            
         elif periodicity == 'daily_filter':            
             datalist["filterid"] = datalist["ledid"]
             for key, items in self._led_to_filter.items(): 
@@ -777,7 +780,7 @@ class FlatPipe( CalibPipe ):
             datalist = datalist.reset_index()
             datalist['day'] = 1 #Forcing only one day
             datalist['ledid'] = None
-
+            
             periodicity='daily' #Reset_periodicity
 
         else : 
@@ -787,7 +790,7 @@ class FlatPipe( CalibPipe ):
             datalist['day'] = 1 #Forcing only one day
             datalist["filterid"] = None #To obtain all purpose function
         
-        pdata = getattr(self, periodicity+'_ccds_norm')
+        pdata = getattr(self, periodicityk+'_ccds_norm')
         
         if 'dask' in str(type(pdata)):  #UGLY WILL CHANGE
             pdata = pdata.compute()
@@ -1022,13 +1025,22 @@ class FlatPipe( CalibPipe ):
 
         if type(self.daily_ccds) == list:
             pdata = npda.stack(self.daily_ccds)
+            normdata = npda.stack(self.daily_ccds_norm)
         else : 
             pdata = self.daily_ccds
-            
+            normdata = self.daily_ccds_norm
+
         period_filters = []
+        period_filters_norm = []
+
         for i, ccdi in period_ccd.iteritems():
             ccdicol = npda.average(pdata[ccdi] , weights=weights[i[2]], axis=axis)
+            normcol = npda.average(self.daily_ccds_norm[ccdi], weights=weights[i[2]])
             period_filters.append(ccdicol)
+            period_filters_norm.append(normcol)
+            
+        self.daily_filter_ccds_norm = period_filters_norm
+        self.daily_filter_ccds = period_filters
 
         return period_filters
         

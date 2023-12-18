@@ -62,7 +62,7 @@ def build_science_image(rawfile, flat, bias,
                             dask_level=None, 
                             corr_nl=True,
                             corr_overscan=True,
-                            overwrite=True, **kwargs):
+                            overwrite=True, fp_flatfield=False, newfile_dict = {}, return_sci_quads = False , **kwargs):
     """ Top level method to build a single processed image.
 
     It calls:
@@ -103,7 +103,20 @@ def build_science_image(rawfile, flat, bias,
 
     overwrite: bool
         should this overwirte existing files ?
-
+        
+    fp_flatfield : bool
+        If True, applies a focal plane normalization to the flat. 
+        Beware, if files are not available, it does not raise and error and use files on disk.
+        
+    newfile_dict : dict
+        Kwargs for the ipacfilemant_to_ztfin2p3filepath to change easily filename and extensions. 
+        
+    return_sci_quads : bool
+        If True, returns a list of ztfimg.ScienceQuadrants and filepaths. Otherwise, returns only filepaths
+        
+    **kwargs : 
+        Arguments passed to the ztfimg.RawCCD.get_data of the raw object image.
+        
     Returns
     -------
     list
@@ -111,7 +124,7 @@ def build_science_image(rawfile, flat, bias,
     """
     # new of ipac sciimg.
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
-    new_filenames = [ipacfilename_to_ztfin2p3filepath(f) for f in ipac_filepaths]
+    new_filenames = [ipacfilename_to_ztfin2p3filepath(f, **newfile_dict) for f in ipac_filepaths]
     
     # Patch
     # Here avoid to do all the computation to not do the work in the end. 
@@ -129,7 +142,7 @@ def build_science_image(rawfile, flat, bias,
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
                                                         dask_level=None,
                                                         corr_nl=corr_nl,
-                                                corr_overscan=corr_overscan, **kwargs)
+                                                corr_overscan=corr_overscan, fp_flatfield=fp_flatfield, **kwargs)
     
         new_header = dask.delayed(build_science_headers)(rawfile,
                                                          ipac_filepaths=ipac_filepaths,
@@ -143,7 +156,7 @@ def build_science_image(rawfile, flat, bias,
         new_data = build_science_data(rawfile, flat, bias,
                                           dask_level=dask_level,
                                           corr_nl=corr_nl,
-                                          corr_overscan=corr_overscan, **kwargs)
+                                          corr_overscan=corr_overscan,fp_flatfield=fp_flatfield,  **kwargs)
     
         new_header = build_science_headers(rawfile,
                                             ipac_filepaths=ipac_filepaths,
@@ -154,7 +167,10 @@ def build_science_image(rawfile, flat, bias,
                                    use_dask=use_dask)
     
 
-    return outs
+    if return_sci_quads : 
+        return [ztfimg.ScienceQuadrant.from_data(data=data, header=header) for data,header in zip(new_data, new_header)], outs
+    else :
+        return outs
 
 # ------------- # 
 #  mid-level    #
@@ -164,7 +180,7 @@ def build_science_data(rawfile,
                       dask_level=None, 
                       corr_nl=True,
                       corr_overscan=True,
-                      as_path=True, **kwargs):
+                      as_path=True, fp_flatfield=False, **kwargs):
     """ build a single processed image data
 
     The function corrects for the sensor effects going from 
@@ -208,16 +224,22 @@ def build_science_data(rawfile,
     """
     use_dask = dask_level is not None
     # Generic I/O for flat and bias
-    if type(flat) is str:
+    if type(flat) is str:        
         flat = ztfimg.CCD.from_filename(flat, as_path=True,
                                         use_dask=use_dask).get_data()    
+    
+            
 
     elif ztfimg.CCD in flat.__class__.__mro__:
         flat = flat.get_data()
-
+            
     elif not "array" in str( type(flat) ): # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
     
+    
+    if fp_flatfield: 
+        fp_flat_norm = get_fp_norm(flat.filepath)/flat.header['FLTNORM']
+
     # bias
     if type(bias) is str:
         bias = ztfimg.CCD.from_filename(bias, as_path=True,
@@ -251,6 +273,8 @@ def build_science_data(rawfile,
     # calib_data = XXX # Pixel bias correction comes here
     calib_data -= bias # bias correction
     calib_data /= flat # flat correction
+    if fp_flatfield : 
+        calib_data *= fp_flat_norm
     
     # CCD object to accurately split the data.
     sciccd = ztfimg.CCD.from_data(calib_data) # dask.array if use_dask
@@ -383,3 +407,31 @@ def header_from_quadrantheader(header, skip=["CID", "CAL", "CLRC", "APCOR",
     newheader.set("ZTFIMGV", ztfimg.__version__, "ztfimg pipeline version")
     newheader.set("PIPETIME", datetime.now().isoformat(), "ztfin2p3 file creation")
     return newheader
+
+
+
+def get_fp_norm(flat_file):
+    try : 
+        fp_flats_norms = fits.getval(flat_file, 'FLTNORM_FP')
+    except KeyError: 
+        fp_flats_norms = []
+        for i in range(1,17) : 
+            tmp = flat_file.split('_')
+            tmp[-3] = f'c{i:02d}'
+            flat = '_'.join(tmp)
+            try :
+                fp_flats_norms.append(ztfimg.CCD.from_filename(flat).get_data()*fits.getval(flat_file, 'FLTNORM'))
+            except OSError as e:
+                continue
+        
+        fp_flats_norms = np.median(fp_flats_norms)
+        for i in range(1,17) : 
+            tmp = flat_file.split('_')
+            tmp[-3] = f'c{i:02d}'
+            flat = '_'.join(tmp)
+            try :
+                fits.setval(flat, 'FLTNORM_FP', value=fp_flats_norms)
+            except OSError as e:
+                continue
+                
+    return fp_flats_norms

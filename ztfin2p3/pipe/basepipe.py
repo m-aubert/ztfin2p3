@@ -82,7 +82,7 @@ class CalibPipe( BasePipe ):
         """
         this = cls([start, end], use_dask=use_dask)
         # Load the associated metadata
-        this.load_metadata(**kwargs)
+        this.load_metadata(use_dask=use_dask, **kwargs)
         if not skip : 
             return this
         else : 
@@ -251,7 +251,7 @@ class CalibPipe( BasePipe ):
                                             day=row.day,)
                                             
                 data = pdata[row['index']]
-                out = self._to_fits(fileout, data, header=hdata[row['index']]  **kwargs)
+                out = self._to_fits(fileout, data, header=hdata[row['index']],  **kwargs)
                 outs.append(out)
                 
         return outs

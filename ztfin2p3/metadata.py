@@ -204,7 +204,7 @@ class MetaDataHandler( object ):
         return io.bulk_get_file(files, client=client, as_dask=as_dask)
         
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, add_filepath=False):
+    def get_metadata(cls, date, ccdid=None, fid=None, add_filepath=False, **kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -519,7 +519,7 @@ class RawScienceMetaData( RawMetaData ):
     _SUBKIND = "object"
     
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, field=None, add_filepath=True):
+    def get_metadata(cls, date, ccdid=None, fid=None, field=None, add_filepath=True,**kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:

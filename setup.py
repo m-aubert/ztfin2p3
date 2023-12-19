@@ -6,7 +6,7 @@ LONG_DESCRIPTION = """ ztfin2p3 """
 
 DISTNAME = 'ztfin2p3'
 AUTHOR = 'Mickael Rigault'
-MAINTAINER = 'Mickael Rigault' 
+MAINTAINER = 'Mickael Rigault'
 MAINTAINER_EMAIL = 'm.rigault@ipnl.in2p3.fr'
 URL = 'https://github.com/MickaelRigault/ztfin2p3'
 LICENSE = 'Apache 2.0'
@@ -19,7 +19,7 @@ try:
 except ImportError:
     from distutils.core import setup
     _has_setuptools = False
-    
+
 def check_dependencies():
     install_requires = []
     try:
@@ -39,8 +39,8 @@ if __name__ == "__main__":
     else:
         # This should be updated if new submodules are added
         packages = ['ztfin2p3']
-    
-        
+
+
     setup(name=DISTNAME,
           author=AUTHOR,
           author_email=MAINTAINER_EMAIL,
@@ -62,5 +62,11 @@ if __name__ == "__main__":
               'Topic :: Scientific/Engineering :: Astronomy',
               'Operating System :: POSIX',
               'Operating System :: Unix',
-              'Operating System :: MacOS'],
+              'Operating System :: MacOS',
+          ],
+          entry_points={
+              'console_scripts': [
+                  'ztfin2p3-d2a = ztfin2p3.scripts.detrend2aper:main',
+              ]
+          }
       )

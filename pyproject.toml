@@ -18,10 +18,20 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
+    "astropy",
+    "dask",
+    "healpy",
+    "matplotlib",
     "pandas",
-    # "ztfimg",
+    "scipy",
+    "tomli",
+    "ztfimg>=0.12.0",
+    "ztfquery",
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+all = ["HMpTy", "htmcatalog", "paramiko", "scp", "scikit-sparse"]
 
 [project.urls]
 Repository = "https://github.com/MickaelRigault/ztfin2p3"

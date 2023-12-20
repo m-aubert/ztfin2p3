@@ -37,22 +37,23 @@ def main():
         "--ccdid",
         nargs="+",
         type=int,
-        help="ccdid or list of ccdid in the range 0 to 16",
+        help="ccdid or list of ccdid in the range 1 to 16",
     )
     parser.add_argument(
         "--period",
-        nargs="+",
         type=int,
         help="Length of period. Int for daily period. 1 = daily. 2 equal every two days",
     )
     args = parser.parse_args()
 
     ccdid = args.ccdid
+    if min(ccdid) < 1 or max(ccdid) > 16:
+        raise ValueError("ccdid must be between 1 and 16")
+
     day = args.day  # YYYY-MM-D
     dt1d = np.timedelta64(args.period, "D")
 
     # Need to rework on the skipping method though.
-    bi = BiasPipe.from_period(day, str(np.datetime64(day) + dt1d), ccdid=ccdid, skip=10)
     bi = BiasPipe.from_period(day, str(np.datetime64(day) + dt1d), ccdid=ccdid, skip=10)
     bi.build_daily_ccds(
         corr_nl=True,

@@ -615,7 +615,7 @@ class CalibPipe( BasePipe ):
             if type(self.daily_ccds) == list:
                 
                 data_outs = []
-                for _, ccd_idx in ccds_dailycol.iteritems(): 
+                for _, ccd_idx in ccds_dailycol.items(): 
                     outi = calib_from_data(npda.stack([self.daily_ccds[ccdid_idxi] for ccdid_idxi in ccd_idx],
                                                       axis=0) , 
                                            **prop)
@@ -627,7 +627,7 @@ class CalibPipe( BasePipe ):
                 
                 self._period_ccds = npda.stack([calib_from_data(self.daily_ccds[ccd_idx,:,:], 
                                                                                  **prop) 
-                                              for _, ccd_idx in ccds_dailycol.iteritems()], 
+                                              for _, ccd_idx in ccds_dailycol.items()], 
                                              axis=0)    
             
         else : 

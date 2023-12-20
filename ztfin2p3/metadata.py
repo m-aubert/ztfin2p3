@@ -254,7 +254,7 @@ class MetaDataHandler( object ):
         months = cls._daterange_to_monthlist_(start, end)
         data = pandas.concat([cls.get_monthly_metadata(yyyy,mm) for yyyy,mm in months])
         
-        datecol = data["obsdate"].astype('datetime64')
+        datecol = pandas.to_datetime(data["obsdate"], format='ISO8601')
         data = data[datecol.between(start.isoformat(), end.isoformat())]
         #          #
         #  CCDID   #

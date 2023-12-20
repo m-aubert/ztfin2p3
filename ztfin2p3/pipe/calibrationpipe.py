@@ -402,9 +402,9 @@ class FlatPipe( CalibPipe ):
         datalist = datalist.reset_index().set_index(["day", "ccdid", "ledid"])["index"] 
 
         ccd_list = []
-        for item, val in bias_ccds.iteritems():
+        for item, val in bias_ccds.items():
             ccd_bias = val.data
-            for itemi , vali in datalist.loc[item].iteritems():
+            for itemi , vali in datalist.loc[item].items():
                 ccd_per_led = self.daily_ccds[vali] - ccd_bias
                 ccd_list.append(ccd_per_led)
 
@@ -489,7 +489,7 @@ class FlatPipe( CalibPipe ):
             ccds_dailycol= datalist.reset_index().groupby(_groupbyk).index.apply(list) 
 
             self.period_ccds_norm = npda.stack([ npda.mean(self.daily_ccds_norm[ccd_idx])
-                                          for _, ccd_idx in ccds_dailycol.iteritems()], 
+                                          for _, ccd_idx in ccds_dailycol.items()], 
                                          axis=0) #There is probably a more proper way to do that
 
                             
@@ -718,7 +718,7 @@ class FlatPipe( CalibPipe ):
 
         period_filters = []
         period_filters_norm = [] 
-        for i, ccdi in period_ccd.iteritems():
+        for i, ccdi in period_ccd.items():
             ccdicol = npda.average(self.period_ccds[ccdi], 
                                    weights=weights[i[1]], axis=axis)
             ccdidcol_norm = npda.average(self.period_ccds_norm[ccdi], 
@@ -1033,7 +1033,7 @@ class FlatPipe( CalibPipe ):
         period_filters = []
         period_filters_norm = []
 
-        for i, ccdi in period_ccd.iteritems():
+        for i, ccdi in period_ccd.items():
             ccdicol = npda.average(pdata[ccdi] , weights=weights[i[2]], axis=axis)
             normcol = npda.average(self.daily_ccds_norm[ccdi], weights=weights[i[2]])
             period_filters.append(ccdicol)

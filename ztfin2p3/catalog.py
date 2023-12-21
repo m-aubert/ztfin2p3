@@ -160,9 +160,12 @@ def get_refcatalog(ra, dec, radius, which, enrich=True,
         raise NotImplementedError(f" Only {list(IN2P3_CATNAME.keys())} CC-IN2P3 catalogs implemented ; {which} given")
     
     hmt_id = get_htm_intersect(ra, dec, radius, depth=7)
-    dirpath = os.path.join(IN2P3_LOCATION, IN2P3_CATNAME[which])
+    catpath = os.getenv("ZTFREFCAT", IN2P3_LOCATION)
+    dirpath = os.path.join(catpath, IN2P3_CATNAME[which])
     # all tables
-    tables = [Table.read(os.path.join(dirpath, f"{htm_id_}.fits")) for htm_id_ in hmt_id]
+    tables = [Table.read(os.path.join(dirpath, f"{htm_id_}.fits"),
+                         unit_parse_strict='silent')
+              for htm_id_ in hmt_id]
     # table.to_pandas() only accepts single-value columns.
     if colnames is None:
         t_ = tables[0] # test table 

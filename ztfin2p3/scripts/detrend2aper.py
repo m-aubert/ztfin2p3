@@ -3,7 +3,10 @@ import logging
 import time
 
 import numpy as np
+from astropy.io import fits
 from ztfimg import CCD
+from ztfquery.buildurl import filename_to_url
+
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
@@ -153,6 +156,10 @@ def main():
                 # filepath and not images. Will change.
                 logger.info("aperture photometry for quadrant %d", quad.qid)
                 t0 = time.time()
+                fname_mask = filename_to_url(
+                    out, suffix="mskimg.fits.gz", source="local"
+                )
+                quad.set_mask(fits.getdata(fname_mask))
                 apcat = get_aperture_photometry(
                     quad,
                     cat="gaia_dr2",
@@ -169,7 +176,9 @@ def main():
                     out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
                 )
                 out = store_aperture_catalog(apcat, output_filename)
-                logger.info("aperture done, quad %d, %.2f sec.", quad.qid, time.time() - t0)
+                logger.info(
+                    "aperture done, quad %d, %.2f sec.", quad.qid, time.time() - t0
+                )
                 logger.debug(out)
 
 

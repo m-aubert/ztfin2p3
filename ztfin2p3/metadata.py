@@ -1,16 +1,104 @@
 """ Handling metadata """
 
-import os
+from .io import LOCALSOURCE
+
+
+
 import numpy as np
 import pandas
-import warnings
-from .utils.tools import parse_singledate
+import dask
+
+from astropy import time
+
+__all__ = ["get_metadata"]
+
+
+def _get_metadir(which):
+    """ 
+    Parameters
+    ----------
+    which: str
+        which metadata you want access to:
+        - raw(-*)
+        - sci
+        - ref
+    """        
+    return os.path.join(io.LOCALSOURCE, "meta", which)
+
+def get_metadata(time_range, 
+                 format=None, which="raw-calib",
+                 use_dask=False,
+                 columns=None, **kwargs):
+    """ 
+    
+    Parameters
+    ----------
+    time_range: sequence, ndarray, number, str, bytes, or `~astropy.time.Time` object
+        start and stop values to initialize the time range. 
+            
+    format: str, optional
+        Format of input time_range values (e.g., ISO, JD, or Unix time). 
+        By default, the same format will be used for output representation. 
+        
+    which: str
+        metadata to be accessed ("{kind}-{subkind}")
+        - raw-calib, raw-object
+        - sci
+        - ref
+    
+    use_dask: bool
+        which read_parquet method to use (dask or pandas)
+        
+    columns: list
+        read_parquet option to select tables while reading
+        
+    **kwargs goes to read_parquet
+    
+    Returns
+    -------
+    DataFrame
+        (dask or pandas)
+        
+    Examples:
+    ---------
+        meta = get_metadata(["2019-04-03", "2019-04-06"])
+    """
+    time_range = time.Time(time_range, format=format)
+    start_, stop_ = ["-".join(l.split("-")[:2]) for l in time_range.iso]
+    list_files = ["-".join(str(l).split("-")[:2]) for l in pandas.date_range(start=start_+"-01", end=stop_+"-01", freq='m').values
+                 ] + [start_, stop_]
+
+    
+    kind, *subkind = which.split("-")
+    metadata_dir = _get_metadir(kind)
+    
+    if len(subkind)>0:
+        basename = f"{kind}{subkind[0]}_metadata"
+    elif len(subkind)==0:
+        basename = f"{kind}_metadata"
+    else:
+        raise ValueError("Cannot parse input which")
+
+    # dask or no
+    if use_dask:
+        read_parquet = dask.dataframe.read_parquet
+    else:
+        read_parquet = pandas.read_parquet
+        
+    data = read_parquet([os.path.join(metadata_dir, f"{basename}_{date_.replace('-','')}.parquet") 
+                                        for date_ in np.unique(list_files)],
+                            columns=columns,
+                           **kwargs)
+    flag_time = data["obsjd"].between(*time_range.jd)
+    return data[flag_time]
 
 
 
-__all__ = ["get_raw"]
-
-
+# =============== #
+#                 #
+#  DEPRECATED     #
+#
+# =============== #
 def download_metadata(kind="raw", year_range=[2018, 2024], use_dask=False, overwrite=False):
     """ """
     from ztfquery import query

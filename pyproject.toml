@@ -39,6 +39,10 @@ Repository = "https://github.com/MickaelRigault/ztfin2p3"
 [project.scripts]
 ztfin2p3-d2a = "ztfin2p3.scripts.detrend2aper:main"
 
+[tool.setuptools]
+package-dir = {"" = "."}
+
+
 [tool.setuptools.dynamic]
 version = {attr = "ztfin2p3.__version__"}
 

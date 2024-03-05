@@ -236,7 +236,7 @@ def build_science_data(rawfile,
     
             
 
-    elif ztfimg.CCD in flat.__class__.__mro__:
+    elif isinstance(flat, ztfimg.CCD):
         flat = flat.get_data()
             
     elif not "array" in str( type(flat) ): # numpy or dask
@@ -253,7 +253,7 @@ def build_science_data(rawfile,
     if type(bias) is str:
         bias = ztfimg.CCD.from_filename(bias, as_path=True,
                                         use_dask=use_dask).get_data()    
-    elif ztfimg.CCD in bias.__class__.__mro__:
+    elif isinstance(bias, ztfimg.CCD):
         bias = bias.get_data()
     elif not "array" in str( type(flat) ): # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")

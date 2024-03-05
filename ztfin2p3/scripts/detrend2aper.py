@@ -201,10 +201,8 @@ def main():
             timing = time.time() - t0
             logger.info("sci done, %.2f sec.", timing)
             sci_info["files"].append({"file": raw_file, "time": timing, **aper_stats})
-            break
 
         stats["science"].append(sci_info)
-        break
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])

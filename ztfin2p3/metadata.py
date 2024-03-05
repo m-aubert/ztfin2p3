@@ -23,7 +23,7 @@ def _get_metadir(which):
         - sci
         - ref
     """        
-    return os.path.join(io.LOCALSOURCE, "meta", which)
+    return os.path.join(LOCALSOURCE, "meta", which)
 
 def get_metadata(time_range, 
                  format=None, which="raw-calib",

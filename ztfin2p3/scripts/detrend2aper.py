@@ -1,4 +1,3 @@
-import argparse
 import datetime
 import json
 import logging
@@ -6,7 +5,9 @@ import pathlib
 import time
 
 import numpy as np
+import rich_click as click
 from astropy.io import fits
+from rich.logging import RichHandler
 from ztfimg import CCD
 from ztfquery.buildurl import filename_to_url
 
@@ -32,39 +33,47 @@ def daily_datalist(fi):
     return datalist
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="ZTFIN2P3 pipeline : Detrending to Aperture."
-    )
-    parser.add_argument("day", help="day to process in YYYY-MM-DD format")
-    parser.add_argument(
-        "-c",
-        "--ccdid",
-        required=True,
-        type=int,
-        choices=range(1, 17),
-        help="ccdid in the range 1 to 16",
-    )
-    parser.add_argument(
-        "--period", type=int, default=1, help="number of days to process, 1 = daily"
-    )
-    parser.add_argument(
-        "--statsdir", default="", help="path where statistics are stored (default: cwd)"
-    )
-    parser.add_argument("--suffix", help="suffix for output science files")
-    args = parser.parse_args()
+@click.command()
+@click.argument("day")
+@click.option(
+    "-c",
+    "--ccdid",
+    required=True,
+    type=click.IntRange(1, 16),
+    help="ccdid in the range 1 to 16",
+)
+@click.option(
+    "--period",
+    type=int,
+    default=1,
+    help="number of days to process, 1 = daily",
+    show_default=True,
+)
+@click.option(
+    "--statsdir",
+    default=".",
+    help="path where statistics are stored",
+    show_default=True,
+)
+@click.option("--suffix", help="suffix for output science files")
+def detrend2aper(day, ccdid, period, statsdir, suffix):
+    """Detrending to Aperture.
+
+    \b
+    Process DAY (must be specified in YYYY-MM-DD format):
+    - computer master bias
+    - computer master flat
+    - for all science exposures, apply master bias and master flat, and run
+      aperture photometry.
+
+    """
 
     logging.basicConfig(
-        level="INFO",
-        format="[%(levelname)s] %(asctime)s %(message)s",
-        datefmt="%H:%M:%S",
-        # handlers=[RichHandler(**handler_opts)],
+        level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
     )
 
-    statsdir = pathlib.Path(args.statsdir)
-    ccdid = args.ccdid
-    day = args.day  # YYYY-MM-D
-    dt1d = np.timedelta64(args.period, "D")
+    statsdir = pathlib.Path(statsdir)
+    dt1d = np.timedelta64(period, "D")
     start, end = day, str(np.datetime64(day) + dt1d)
 
     now = datetime.datetime.now(datetime.UTC).isoformat()
@@ -133,7 +142,7 @@ def main():
         "".join(day.split("-")), ccdid
     ]
 
-    newfile_dict = dict(new_suffix=args.suffix)
+    newfile_dict = dict(new_suffix=suffix)
     stats["science"] = []
 
     for _, row in flat_datalist.iterrows():
@@ -220,7 +229,3 @@ def main():
     stats_file = statsdir / f"stats_{day}_{ccdid}.json"
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))
-
-
-if __name__ == "__main__":
-    main()

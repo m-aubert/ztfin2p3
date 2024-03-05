@@ -43,7 +43,7 @@ def main():
         help="ccdid in the range 1 to 16",
     )
     parser.add_argument(
-        "--period", type=int, default=1, help="Number of fays to process, 1 = daily"
+        "--period", type=int, default=1, help="Number of days to process, 1 = daily"
     )
     args = parser.parse_args()
 

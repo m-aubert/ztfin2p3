@@ -59,10 +59,12 @@ def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs)
     return outs
 
 def build_science_image(rawfile, flat, bias,
+                            flat_coef=None,
                             dask_level=None, 
                             corr_nl=True,
                             corr_overscan=True,
-                            overwrite=True):
+                            overwrite=True,
+                            ):
     """ Top level method to build a single processed image.
 
     It calls:
@@ -104,6 +106,10 @@ def build_science_image(rawfile, flat, bias,
     overwrite: bool
         should this overwirte existing files ?
 
+    flat_coef: float
+        if given, this will multiply to the flat
+        flatused = flat*flatcoef
+
     Returns
     -------
     list
@@ -118,7 +124,8 @@ def build_science_image(rawfile, flat, bias,
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
                                                         dask_level=None,
                                                         corr_nl=corr_nl,
-                                                        corr_overscan=corr_overscan)
+                                                        corr_overscan=corr_overscan,
+                                                        flat_coef=flat_coef)
     
         new_header = dask.delayed(build_science_headers)(rawfile,
                                                             ipac_filepaths=ipac_filepaths,
@@ -132,7 +139,8 @@ def build_science_image(rawfile, flat, bias,
         new_data = build_science_data(rawfile, flat, bias,
                                           dask_level=dask_level,
                                           corr_nl=corr_nl,
-                                          corr_overscan=corr_overscan)
+                                          corr_overscan=corr_overscan,
+                                          flat_coef=flat_coef)
     
         new_header = build_science_headers(rawfile,
                                             ipac_filepaths=ipac_filepaths,
@@ -142,7 +150,6 @@ def build_science_image(rawfile, flat, bias,
         outs = store_science_image(new_data, new_header, new_filenames,
                                    use_dask=use_dask)
     
-
     return outs
 
 # ------------- # 
@@ -153,6 +160,7 @@ def build_science_data(rawfile,
                       dask_level=None, 
                       corr_nl=True,
                       corr_overscan=True,
+                      flat_coef=None,
                       as_path=True):
     """ build a single processed image data
 
@@ -189,6 +197,10 @@ def build_science_data(rawfile,
     corr_nl: bool
         Should data be corrected for non-linearity
 
+    flat_coef: float
+        if given, this will multiply to the flat
+        flatused = flat*flatcoef
+
     Parameters
     ----------
     list
@@ -204,6 +216,9 @@ def build_science_data(rawfile,
         flat = flat.get_data()
     elif not "array" in str( type(flat) ): # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
+
+    if flat_coef is not None:
+        flat *= flat_coef 
     
     # bias
     if type(bias) is str:
@@ -215,19 +230,21 @@ def build_science_data(rawfile,
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
 
     # Create the new data
-    
-    if dask_level is None:
-        rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=True, use_dask=False)
+    if type(rawfile) is str:
+        if dask_level is None:
+            rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=True, use_dask=False)
         
-    elif dask_level == "medium":
-        rawccd = dask.delayed(ztfimg.RawCCD.from_filename)(rawfile, 
-                                                           as_path=True, 
-                                                           use_dask=False)
-    elif dask_level == "deep":
-        rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=as_path, use_dask=True)
+        elif dask_level == "medium":
+            rawccd = dask.delayed(ztfimg.RawCCD.from_filename)(rawfile, 
+                                                                   as_path=True, 
+                                                                   use_dask=False)
+        elif dask_level == "deep":
+            rawccd = ztfimg.RawCCD.from_filename(rawfile, as_path=as_path, use_dask=True)
+        else:
+            raise ValueError(f"dask_level should be None, 'medium' or 'deep', {dask_level} given")
     else:
-        raise ValueError(f"dask_level should be None, 'medium' or 'deep', {dask_level} given")
-    
+        rawccd = rawfile
+        
     # Step 2. Create new data, header, filename -------- #
     # new science data
     calib_data = rawccd.get_data(corr_nl=corr_nl, corr_overscan=corr_overscan)

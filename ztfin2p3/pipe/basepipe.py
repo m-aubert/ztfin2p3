@@ -715,10 +715,10 @@ class CalibPipe( BasePipe ):
             
         return self.datafile.groupby(groupby_)["filepath"].apply(list).reset_index()
 
-    def load_metadata(self, period=None, **kwargs):
+    def load_metadata(self, **kwargs):
         """ """
         from .. import metadata        
-        if period is None and self._period is None:
+        if self.period is None:
             raise ValueError("no period given and none known")
         datafile = metadata.get_rawmeta(self.pipekind, self.period, add_filepath=True, **kwargs)
         self.set_datafile(datafile) 

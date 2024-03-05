@@ -1,5 +1,8 @@
 import argparse
+import datetime
+import json
 import logging
+import pathlib
 import time
 
 import numpy as np
@@ -33,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="ZTFIN2P3 pipeline : Detrending to Aperture."
     )
-    parser.add_argument("day", help="Day to process in YYYY-MM-DD format")
+    parser.add_argument("day", help="day to process in YYYY-MM-DD format")
     parser.add_argument(
         "-c",
         "--ccdid",
@@ -43,8 +46,12 @@ def main():
         help="ccdid in the range 1 to 16",
     )
     parser.add_argument(
-        "--period", type=int, default=1, help="Number of fays to process, 1 = daily"
+        "--period", type=int, default=1, help="number of days to process, 1 = daily"
     )
+    parser.add_argument(
+        "--statsdir", default="", help="path where statistics are stored (default: cwd)"
+    )
+    parser.add_argument("--suffix", help="suffix for output science files")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -54,16 +61,22 @@ def main():
         # handlers=[RichHandler(**handler_opts)],
     )
 
+    statsdir = pathlib.Path(args.statsdir)
     ccdid = args.ccdid
     day = args.day  # YYYY-MM-D
     dt1d = np.timedelta64(args.period, "D")
+    start, end = day, str(np.datetime64(day) + dt1d)
+
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    stats = {"date": now, "start": start, "end": end, "ccd": ccdid}
+    tot = time.time()
 
     logger = logging.getLogger(__name__)
     logger.info("processing day %s, ccd %s", day, ccdid)
     logger.info("computing bias...")
     t0 = time.time()
     # Need to rework on the skipping method though.
-    bi = BiasPipe.from_period(day, str(np.datetime64(day) + dt1d), ccdid=ccdid, skip=10)
+    bi = BiasPipe.from_period(start, end, ccdid=ccdid, skip=10)
     bi.build_daily_ccds(
         corr_nl=True,
         corr_overscan=True,
@@ -78,8 +91,10 @@ def main():
         get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
     )
     outs = bi.store_ccds(periodicity="daily", incl_header=True, overwrite=True)
-    logger.info("bias done, %.2f sec.", time.time() - t0)
+    timing = time.time() - t0
+    logger.info("bias done, %.2f sec.", timing)
     logger.debug("\n".join(outs))
+    stats["bias"] = {"time": timing, "files": outs}
 
     # Generate flats :
     logger.info("computing flat...")
@@ -102,8 +117,10 @@ def main():
         bias=bi,
     )
     outs = fi.store_ccds(periodicity="daily_filter", incl_header=True, overwrite=True)
-    logger.info("flat done, %.2f sec.", time.time() - t0)
+    timing = time.time() - t0
+    logger.info("flat done, %.2f sec.", timing)
     logger.debug("\n".join(outs))
+    stats["flat"] = {"time": timing, "files": outs}
 
     # Generate Science :
     # First browse meta data :
@@ -116,24 +133,26 @@ def main():
         "".join(day.split("-")), ccdid
     ]
 
-    newfile_dict = dict(new_suffix="ztfin2p3-testE2E")
+    newfile_dict = dict(new_suffix=args.suffix)
+    stats["science"] = []
 
-    for i, row in flat_datalist.iterrows():
-        objects_files = rawsci_list.loc[
-            row.day, row.filterid, row.ccdid
-        ].filepath.values
-
+    for _, row in flat_datalist.iterrows():
+        objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
+        nfiles = len(objects_files)
+        msg = "processing %s filter=%s ccd=%s: %d files"
+        logger.info(msg, row.day, row.filterid, row.ccdid, nfiles)
+        sci_info = {
+            "day": row.day,
+            "filter": row.filterid,
+            "ccd": row.ccdid,
+            "nfiles": nfiles,
+            "files": [],
+        }
         flat = CCD.from_data(fi.daily_filter_ccds[row["index"]])
-        logger.info(
-            "processing %s filter=%s ccd=%s: %d files",
-            row.day,
-            row.filterid,
-            row.ccdid,
-            len(objects_files),
-        )
 
-        for raw_file in objects_files:
-            logger.info("processing sci %s", raw_file)
+        for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
+            raw_file = sci_row.filepath
+            logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
             t0 = time.time()
             quads, outs = build_science_image(
                 raw_file,
@@ -148,14 +167,13 @@ def main():
                 return_sci_quads=True,
                 overscan_prop=dict(userange=[25, 30]),
             )
-            logger.info("sci done, %.2f sec.", time.time() - t0)
 
             # If quadrant level :
+            aper_stats = {}
             for quad, out in zip(quads, outs):
                 # Not using build_aperture_photometry cause it expects
                 # filepath and not images. Will change.
-                logger.info("aperture photometry for quadrant %d", quad.qid)
-                t0 = time.time()
+                logger.debug("aperture photometry for quadrant %d", quad.qid)
                 fname_mask = filename_to_url(
                     out, suffix="mskimg.fits.gz", source="local"
                 )
@@ -176,10 +194,32 @@ def main():
                     out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
                 )
                 out = store_aperture_catalog(apcat, output_filename)
-                logger.info(
-                    "aperture done, quad %d, %.2f sec.", quad.qid, time.time() - t0
-                )
                 logger.debug(out)
+                aper_stats[f"quad_{quad.qid}"] = {
+                    "quad": quad.qid,
+                    "naper": len(apcat),
+                    "file": output_filename,
+                }
+
+            timing = time.time() - t0
+            logger.info("sci done, %.2f sec.", timing)
+            sci_info["files"].append(
+                {
+                    "file": raw_file,
+                    "expid": sci_row.expid,
+                    "time": timing,
+                    **aper_stats,
+                }
+            )
+
+        stats["science"].append(sci_info)
+
+    stats["total_time"] = time.time() - tot
+    logger.info("all done, %.2f sec.", stats["total_time"])
+
+    stats_file = statsdir / f"stats_{day}_{ccdid}.json"
+    logger.info("writing stats to %s", stats_file)
+    stats_file.write_text(json.dumps(stats))
 
 
 if __name__ == "__main__":

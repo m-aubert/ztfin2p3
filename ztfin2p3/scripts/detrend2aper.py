@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="ZTFIN2P3 pipeline : Detrending to Aperture."
     )
-    parser.add_argument("day", help="Day to process in YYYY-MM-DD format")
+    parser.add_argument("day", help="day to process in YYYY-MM-DD format")
     parser.add_argument(
         "-c",
         "--ccdid",
@@ -45,8 +45,9 @@ def main():
         help="ccdid in the range 1 to 16",
     )
     parser.add_argument(
-        "--period", type=int, default=1, help="Number of days to process, 1 = daily"
+        "--period", type=int, default=1, help="number of days to process, 1 = daily"
     )
+    parser.add_argument("--suffix", help="suffix for output science files")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -127,7 +128,7 @@ def main():
         "".join(day.split("-")), ccdid
     ]
 
-    newfile_dict = dict(new_suffix="ztfin2p3-testE2E")
+    newfile_dict = dict(new_suffix=args.suffix)
     stats["science"] = []
 
     for _, row in flat_datalist.iterrows():

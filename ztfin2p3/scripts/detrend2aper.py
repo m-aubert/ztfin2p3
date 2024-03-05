@@ -2,6 +2,7 @@ import argparse
 import datetime
 import json
 import logging
+import pathlib
 import time
 
 import numpy as np
@@ -47,6 +48,9 @@ def main():
     parser.add_argument(
         "--period", type=int, default=1, help="number of days to process, 1 = daily"
     )
+    parser.add_argument(
+        "--statsdir", default="", help="path where statistics are stored (default: cwd)"
+    )
     parser.add_argument("--suffix", help="suffix for output science files")
     args = parser.parse_args()
 
@@ -57,6 +61,7 @@ def main():
         # handlers=[RichHandler(**handler_opts)],
     )
 
+    statsdir = pathlib.Path(args.statsdir)
     ccdid = args.ccdid
     day = args.day  # YYYY-MM-D
     dt1d = np.timedelta64(args.period, "D")
@@ -132,10 +137,7 @@ def main():
     stats["science"] = []
 
     for _, row in flat_datalist.iterrows():
-        objects_files = rawsci_list.loc[
-            row.day, row.filterid, row.ccdid
-        ].filepath.values
-
+        objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
         nfiles = len(objects_files)
         msg = "processing %s filter=%s ccd=%s: %d files"
         logger.info(msg, row.day, row.filterid, row.ccdid, nfiles)
@@ -148,7 +150,8 @@ def main():
         }
         flat = CCD.from_data(fi.daily_filter_ccds[row["index"]])
 
-        for i, raw_file in enumerate(objects_files, start=1):
+        for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
+            raw_file = sci_row.filepath
             logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
             t0 = time.time()
             quads, outs = build_science_image(
@@ -200,17 +203,23 @@ def main():
 
             timing = time.time() - t0
             logger.info("sci done, %.2f sec.", timing)
-            sci_info["files"].append({"file": raw_file, "time": timing, **aper_stats})
+            sci_info["files"].append(
+                {
+                    "file": raw_file,
+                    "expid": sci_row.expid,
+                    "time": timing,
+                    **aper_stats,
+                }
+            )
 
         stats["science"].append(sci_info)
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
 
-    stats_file = f"stats_{day}_{ccdid}.json"
+    stats_file = statsdir / f"stats_{day}_{ccdid}.json"
     logger.info("writing stats to %s", stats_file)
-    with open(stats_file, "w") as fd:
-        json.dump(stats, fd)
+    stats_file.write_text(json.dumps(stats))
 
 
 if __name__ == "__main__":

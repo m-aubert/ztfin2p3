@@ -204,7 +204,7 @@ class MetaDataHandler( object ):
         return io.bulk_get_file(files, client=client, as_dask=as_dask)
         
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, add_filepath=False):
+    def get_metadata(cls, date, ccdid=None, fid=None, add_filepath=False, **kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -254,7 +254,7 @@ class MetaDataHandler( object ):
         months = cls._daterange_to_monthlist_(start, end)
         data = pandas.concat([cls.get_monthly_metadata(yyyy,mm) for yyyy,mm in months])
         
-        datecol = data["obsdate"].astype('datetime64')
+        datecol = pandas.to_datetime(data["obsdate"], format='ISO8601')
         data = data[datecol.between(start.isoformat(), end.isoformat())]
         #          #
         #  CCDID   #
@@ -519,7 +519,7 @@ class RawScienceMetaData( RawMetaData ):
     _SUBKIND = "object"
     
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, field=None, add_filepath=True):
+    def get_metadata(cls, date, ccdid=None, fid=None, field=None, add_filepath=True,**kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:

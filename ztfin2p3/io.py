@@ -54,8 +54,11 @@ def ipacfilename_to_ztfin2p3filepath(filename, new_suffix=None, new_extension=No
             filepath_ = "_".join(l_+[new_suffix])
         
         # new extension
-        if not new_extension.startswith("."): 
-            new_extension = f".{new_extension}"
+        if new_extension is not None : 
+            if not new_extension.startswith("."): 
+                new_extension = f".{new_extension}"
+        else : 
+            new_extension = file_extension
             
         # new filename
         filepath = f"{filepath_}{new_extension}"

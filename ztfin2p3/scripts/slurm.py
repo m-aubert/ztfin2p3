@@ -51,6 +51,12 @@ def sbatch(
     show_default=True,
 )
 @click.option(
+    "--statsdir",
+    default=".",
+    help="path where statistics are stored",
+    show_default=True,
+)
+@click.option(
     "--account",
     default="ztf",
     help="account to charge resources to",
@@ -64,7 +70,7 @@ def sbatch(
 )
 @click.option("--cpu-time", default="2:00:00", help="cputime limit", show_default=True)
 @click.option("--mem", default="4GB", help="memory limit", show_default=True)
-def run_d2a(day, period, account, partition, cpu_time, mem):
+def run_d2a(day, period, statsdir, account, partition, cpu_time, mem):
     """Run d2a for a PERIOD of days on a Slurm cluster."""
 
     dt1d = np.timedelta64(1, "D")
@@ -72,7 +78,7 @@ def run_d2a(day, period, account, partition, cpu_time, mem):
     for i in range(period):
         for ccdid in range(1, 17):
             date = str(np.datetime64(day) + i * dt1d)
-            cmd = f"ztfin2p3 d2a {date} --ccdid {ccdid}"
+            cmd = f"ztfin2p3 d2a {date} --ccdid {ccdid} --statsdir {statsdir}"
             sbatch(
                 f"ztf_d2a_{date}",
                 cmd,

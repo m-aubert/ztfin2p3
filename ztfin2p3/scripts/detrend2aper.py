@@ -42,13 +42,6 @@ def daily_datalist(fi):
     type=click.IntRange(1, 16),
     help="ccdid in the range 1 to 16",
 )
-# @click.option(
-#     "--period",
-#     type=int,
-#     default=1,
-#     help="number of days to process, 1 = daily",
-#     show_default=True,
-# )
 @click.option(
     "--statsdir",
     default=".",
@@ -56,8 +49,8 @@ def daily_datalist(fi):
     show_default=True,
 )
 @click.option("--suffix", help="suffix for output science files")
-def detrend2aper(day, ccdid, statsdir, suffix):
-    """Detrending to Aperture pipeline for a DAY.
+def d2a(day, ccdid, statsdir, suffix):
+    """Detrending to Aperture pipeline for a given day.
 
     \b
     Process DAY (must be specified in YYYY-MM-DD format):

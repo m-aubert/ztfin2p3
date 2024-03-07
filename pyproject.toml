@@ -38,7 +38,6 @@ all = ["HMpTy", "htmcatalog", "paramiko", "scp", "scikit-sparse"]
 Repository = "https://github.com/MickaelRigault/ztfin2p3"
 
 [project.scripts]
-ztfin2p3-d2a = "ztfin2p3.scripts.detrend2aper:main"
 ztfin2p3 = "ztfin2p3.__main__:cli"
 
 [tool.setuptools]

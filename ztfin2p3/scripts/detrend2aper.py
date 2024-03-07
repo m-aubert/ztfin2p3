@@ -11,6 +11,7 @@ from rich.logging import RichHandler
 from ztfimg import CCD
 from ztfquery.buildurl import filename_to_url
 
+from ztfin2p3 import __version__
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
@@ -72,7 +73,13 @@ def d2a(day, ccdid, statsdir, suffix):
     start, end = day, str(np.datetime64(day) + dt1d)
 
     now = datetime.datetime.now(datetime.UTC)
-    stats = {"date": now.isoformat(), "start": start, "end": end, "ccd": ccdid}
+    stats = {
+        "date": now.isoformat(),
+        "start": start,
+        "end": end,
+        "ccd": ccdid,
+        "version": __version__,
+    }
     tot = time.time()
 
     logger = logging.getLogger(__name__)

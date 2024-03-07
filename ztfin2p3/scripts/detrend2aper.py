@@ -42,13 +42,13 @@ def daily_datalist(fi):
     type=click.IntRange(1, 16),
     help="ccdid in the range 1 to 16",
 )
-@click.option(
-    "--period",
-    type=int,
-    default=1,
-    help="number of days to process, 1 = daily",
-    show_default=True,
-)
+# @click.option(
+#     "--period",
+#     type=int,
+#     default=1,
+#     help="number of days to process, 1 = daily",
+#     show_default=True,
+# )
 @click.option(
     "--statsdir",
     default=".",
@@ -56,8 +56,8 @@ def daily_datalist(fi):
     show_default=True,
 )
 @click.option("--suffix", help="suffix for output science files")
-def detrend2aper(day, ccdid, period, statsdir, suffix):
-    """Detrending to Aperture.
+def detrend2aper(day, ccdid, statsdir, suffix):
+    """Detrending to Aperture pipeline for a DAY.
 
     \b
     Process DAY (must be specified in YYYY-MM-DD format):
@@ -73,11 +73,13 @@ def detrend2aper(day, ccdid, period, statsdir, suffix):
     )
 
     statsdir = pathlib.Path(statsdir)
+    # limit period to 1 for now
+    period = 1
     dt1d = np.timedelta64(period, "D")
     start, end = day, str(np.datetime64(day) + dt1d)
 
-    now = datetime.datetime.now(datetime.UTC).isoformat()
-    stats = {"date": now, "start": start, "end": end, "ccd": ccdid}
+    now = datetime.datetime.now(datetime.UTC)
+    stats = {"date": now.isoformat(), "start": start, "end": end, "ccd": ccdid}
     tot = time.time()
 
     logger = logging.getLogger(__name__)
@@ -226,6 +228,6 @@ def detrend2aper(day, ccdid, period, statsdir, suffix):
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
 
-    stats_file = statsdir / f"stats_{day}_{ccdid}.json"
+    stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))

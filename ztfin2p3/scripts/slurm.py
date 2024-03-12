@@ -1,3 +1,6 @@
+import os
+import subprocess
+
 import numpy as np
 import rich_click as click
 
@@ -29,7 +32,7 @@ def sbatch(
         f' -c {cpus} -t {cpu_time} --mem {mem} --wrap "{cmd}"'
     )
     if account:
-        cmd += f"--account={account}"
+        cmd += f" --account={account}"
     if email:
         cmd += f" --mail-user={email} --mail-type=BEGIN,END"
     if output:
@@ -72,9 +75,10 @@ def sbatch(
     help="partition for the resource allocation",
     show_default=True,
 )
+@click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
 @click.option("--cpu-time", default="2:00:00", help="cputime limit", show_default=True)
-@click.option("--mem", default="4GB", help="memory limit", show_default=True)
-def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem):
+@click.option("--mem", default="8GB", help="memory limit", show_default=True)
+def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem, dry_run):
     """Run d2a for a PERIOD of days on a Slurm cluster."""
 
     dt1d = np.timedelta64(1, "D")
@@ -88,11 +92,19 @@ def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem):
         for ccdid in range(1, 17):
             date = str(np.datetime64(day) + i * dt1d)
             cmd = f"{ztfcmd} d2a {date} --ccdid {ccdid} --statsdir {statsdir}"
-            sbatch(
-                f"ztf_d2a_{date}",
+            sbatch_cmd = sbatch(
+                f"ztf_d2a_{date}_ccd{ccdid}",
                 cmd,
                 cpu_time=cpu_time,
                 mem=mem,
                 account=account,
                 partition=partition,
+                output=os.path.join(statsdir, "slurm-%j.log"),
             )
+            if dry_run:
+                print(sbatch_cmd)
+            else:
+                out = subprocess.check_output(
+                    sbatch_cmd, shell=True, stderr=subprocess.STDOUT
+                )
+                print(out.decode().splitlines()[-1])

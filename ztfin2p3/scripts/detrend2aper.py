@@ -3,6 +3,7 @@ import json
 import logging
 import pathlib
 import time
+import sys
 
 import numpy as np
 import rich_click as click
@@ -32,6 +33,56 @@ def daily_datalist(fi):
     datalist = datalist.reset_index()
     datalist["ledid"] = None
     return datalist
+
+
+def process_sci(raw_file, flat, bias, newfile_dict):
+    logger = logging.getLogger(__name__)
+    quads, outs = build_science_image(
+        raw_file,
+        flat,
+        bias,
+        dask_level=None,
+        corr_nl=True,
+        corr_overscan=True,
+        overwrite=True,
+        fp_flatfield=False,
+        newfile_dict=newfile_dict,
+        return_sci_quads=True,
+        overscan_prop=dict(userange=[25, 30]),
+    )
+
+    # If quadrant level :
+    aper_stats = {}
+    for quad, out in zip(quads, outs):
+        # Not using build_aperture_photometry cause it expects
+        # filepath and not images. Will change.
+        logger.debug("aperture photometry for quadrant %d", quad.qid)
+        fname_mask = filename_to_url(out, suffix="mskimg.fits.gz", source="local")
+        quad.set_mask(fits.getdata(fname_mask))
+        apcat = get_aperture_photometry(
+            quad,
+            cat="gaia_dr2",
+            dask_level=None,
+            as_path=False,
+            minimal_columns=True,
+            seplimit=20,
+            radius=np.linspace(3, 13),
+            bkgann=None,
+            joined=True,
+            refcat_radius=0.7,
+        )
+        output_filename = ipacfilename_to_ztfin2p3filepath(
+            out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
+        )
+        out = store_aperture_catalog(apcat, output_filename)
+        logger.debug(out)
+        aper_stats[f"quad_{quad.qid}"] = {
+            "quad": quad.qid,
+            "naper": len(apcat),
+            "file": output_filename,
+        }
+
+    return aper_stats
 
 
 @click.command()
@@ -146,6 +197,7 @@ def d2a(day, ccdid, statsdir, suffix):
 
     newfile_dict = dict(new_suffix=suffix)
     stats["science"] = []
+    n_errors = 0
 
     for _, row in flat_datalist.iterrows():
         objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
@@ -165,60 +217,23 @@ def d2a(day, ccdid, statsdir, suffix):
             raw_file = sci_row.filepath
             logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
             t0 = time.time()
-            quads, outs = build_science_image(
-                raw_file,
-                flat,
-                bias,
-                dask_level=None,
-                corr_nl=True,
-                corr_overscan=True,
-                overwrite=True,
-                fp_flatfield=False,
-                newfile_dict=newfile_dict,
-                return_sci_quads=True,
-                overscan_prop=dict(userange=[25, 30]),
-            )
-
-            # If quadrant level :
-            aper_stats = {}
-            for quad, out in zip(quads, outs):
-                # Not using build_aperture_photometry cause it expects
-                # filepath and not images. Will change.
-                logger.debug("aperture photometry for quadrant %d", quad.qid)
-                fname_mask = filename_to_url(
-                    out, suffix="mskimg.fits.gz", source="local"
-                )
-                quad.set_mask(fits.getdata(fname_mask))
-                apcat = get_aperture_photometry(
-                    quad,
-                    cat="gaia_dr2",
-                    dask_level=None,
-                    as_path=False,
-                    minimal_columns=True,
-                    seplimit=20,
-                    radius=np.linspace(3, 13),
-                    bkgann=None,
-                    joined=True,
-                    refcat_radius=0.7,
-                )
-                output_filename = ipacfilename_to_ztfin2p3filepath(
-                    out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
-                )
-                out = store_aperture_catalog(apcat, output_filename)
-                logger.debug(out)
-                aper_stats[f"quad_{quad.qid}"] = {
-                    "quad": quad.qid,
-                    "naper": len(apcat),
-                    "file": output_filename,
-                }
+            try:
+                aper_stats = process_sci(raw_file, flat, bias, newfile_dict)
+            except Exception as e:
+                status, error_msg = "error", str(e)
+                n_errors += 1
+            else:
+                status, error_msg = "ok", ""
 
             timing = time.time() - t0
-            logger.info("sci done, %.2f sec.", timing)
+            logger.info("sci done, status=%s, %.2f sec.", status, timing)
             sci_info["files"].append(
                 {
                     "file": raw_file,
                     "expid": sci_row.expid,
                     "time": timing,
+                    "status": status,
+                    "error_msg": error_msg,
                     **aper_stats,
                 }
             )
@@ -231,3 +246,7 @@ def d2a(day, ccdid, statsdir, suffix):
     stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))
+
+    if n_errors > 0:
+        logger.warning("%d sci files failed", n_errors)
+        sys.exit(1)

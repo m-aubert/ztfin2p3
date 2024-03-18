@@ -142,6 +142,7 @@ def build_science_image(rawfile, flat, bias,
     
     if dask_level == "shallow": # dasking at the top level method
         new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
+                                                    flat_coef=flat_coef,
                                                         dask_level=None,
                                                         corr_nl=corr_nl,
                                                         corr_overscan=corr_overscan, fp_flatfield=fp_flatfield,
@@ -157,6 +158,7 @@ def build_science_image(rawfile, flat, bias,
     else:
         use_dask = dask_level is not None
         new_data = build_science_data(rawfile, flat, bias,
+                                      flat_coef=flat_coef,
                                           dask_level=dask_level,
                                           corr_nl=corr_nl,
                                           corr_overscan=corr_overscan,fp_flatfield=fp_flatfield,  **kwargs)
@@ -179,6 +181,7 @@ def build_science_image(rawfile, flat, bias,
 # ------------- #
 def build_science_data(rawfile,
                       flat, bias,
+                      flat_coef=None,
                       dask_level=None, 
                       corr_nl=True,
                       corr_overscan=True,
@@ -236,7 +239,7 @@ def build_science_data(rawfile,
     
             
 
-    elif ztfimg.CCD in flat.__class__.__mro__:
+    elif isinstance(flat, ztfimg.CCD):
         flat = flat.get_data()
             
     elif not "array" in str( type(flat) ): # numpy or dask
@@ -253,7 +256,7 @@ def build_science_data(rawfile,
     if type(bias) is str:
         bias = ztfimg.CCD.from_filename(bias, as_path=True,
                                         use_dask=use_dask).get_data()    
-    elif ztfimg.CCD in bias.__class__.__mro__:
+    elif isinstance(bias, ztfimg.CCD):
         bias = bias.get_data()
     elif not "array" in str( type(flat) ): # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")

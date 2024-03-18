@@ -1,7 +1,7 @@
 """ Handling metadata """
 
 from .io import LOCALSOURCE
-
+from ztfquery.buildurl import parse_filename
 
 import os
 import numpy as np
@@ -13,23 +13,53 @@ from astropy import time
 __all__ = ["get_metadata"]
 
 
-def _get_metadir(which):
-    """ 
+
+def get_sciheader(filename, **kwargs):
+    """ """
+    # get needed information
+    expid = filename_to_metadata(filename).iloc[0]["expid"]
+    info = metadata.parse_filename(filename)
+    month = f"{info['year']}{info['month']}"
+    #
+    meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
+    return meta_df
+    
+def filename_to_metadata(filename, kind="raw"):
+    """ fetch metadata associated to the given filename 
+
     Parameters
     ----------
-    which: str
-        which metadata you want access to:
-        - raw(-*)
-        - sci
-        - ref
-    """        
-    return os.path.join(LOCALSOURCE, "meta", which)
+    filename: string, path
+        name of the file (fullpath or basename)
+
+    kind: str
+        kind of metadata: 
+        - raw
+        (- sci, not implemented yet)
+
+    Returns
+    -------
+    DataFrame
+    """
+    info = parse_filename( filename )
+    month = f"{info['year']}{info['month']}"
+
+    metadir = _get_metadir(kind)
+    if kind == "raw":
+        kind = f"{kind}object" if info["imgtypecode"] == "o" else f"{kind}calib"
+        
+    meta_file = os.path.join(metadir, f"{kind}_metadata_{month}.parquet")
+    meta = pandas.read_parquet(meta_file, 
+                          filters=[("filefracday", "==", int(info["filefracday"])), 
+                                   ("ccdid", "==", int(info["ccdid"]))])
+    return meta
+
 
 def get_metadata(time_range, 
                  format=None, which="raw-calib",
                  use_dask=False,
                  columns=None, **kwargs):
-    """ 
+    """ get metadata dataframe for the time range.
     
     Parameters
     ----------
@@ -93,6 +123,68 @@ def get_metadata(time_range,
     return data[flag_time]
 
 
+# =============== #
+#                 #
+#  INTERNAL       #
+#                 #
+# =============== #
+
+def _get_metadir(which):
+    """ 
+    Parameters
+    ----------
+    which: str
+        which metadata you want access to:
+        - raw(-*)
+        - sci
+        - ref
+    """        
+    return os.path.join(LOCALSOURCE, "meta", which)
+
+def _get_sciheader(month, expid=None, rcid=None, filters=None, **kwargs):
+    """ low level get_sciheader given the strored structure 
+    
+    Parameters
+    ----------
+    month: string, int
+        month YYYYMM, e.g. 201904 for April 2019.
+
+    expid: string, int, None
+        if given, selects the ZTF exposure ID (appends to filters)
+
+    rcid: string, int
+        if given, selects the ZTF RCID (appends to filters)
+
+    filters: list, None
+        if given, filtering to selection data while reading the parquet file
+        (see pandas.read_parquet())
+
+    **kwargs goes to pandas.read_parquet()
+        
+    Returns
+    -------
+    DataFrame
+    
+    Example
+    -------
+    header_df = metah = _get_sciheader('201904', expid=84831745, rcid=1)
+    """
+    # filepath
+    sciheader_file = os.path.join( os.path.join(LOCALSOURCE, "meta", "sci"),
+                                   f"metaheader_{month}.parquet")
+    # filtering
+    if filters is None:
+        filters = []
+    if expid is not None:
+        filters.append( ("EXPID", "==", str(expid)) ) 
+        
+    if rcid is not None:
+        filters.append( ("RCID", "==", str(rcid)) )
+    
+    # actually data access 
+    return pandas.read_parquet(sciheader_file,
+                               filters=filters,
+                               **kwargs)
 
 # =============== #
 #                 #

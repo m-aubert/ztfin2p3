@@ -50,3 +50,11 @@ version = {attr = "ztfin2p3.__version__"}
 
 [tool.setuptools.package-data]
 ztfin2p3 = ["config/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "docs"]
+filterwarnings = [
+    # action:message:category:module:lineno
+    # "error",
+    "ignore:.*Dask DataFrame implementation is deprecated.*:DeprecationWarning",
+]

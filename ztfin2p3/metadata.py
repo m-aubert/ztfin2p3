@@ -9,6 +9,7 @@ import pandas
 import dask
 
 from astropy import time
+from astropy.io import fits
 
 __all__ = ["get_metadata"]
 
@@ -22,7 +23,13 @@ def get_sciheader(filename, **kwargs):
     month = f"{info['year']}{info['month']}"
     #
     meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
-    return meta_df
+    hdr = dict(meta_df.iloc[0])
+    # seems this one was not parsed correctly, remove it ("'")
+    del hdr['SCAMPPTH']
+    # reconstruct header string, so numerical values are parsed by Header
+    hdr_string = "\n".join(f"{k:8s}= {v}" for k, v in hdr.items())
+    hdr = fits.Header.fromstring(hdr_string, sep="\n")
+    return hdr
     
 def filename_to_metadata(filename, kind="raw"):
     """ fetch metadata associated to the given filename 

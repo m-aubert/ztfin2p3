@@ -317,7 +317,7 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
 def exception_header(file_):
     hdr = None
     try:
-        hdr = fits.Header(dict(get_sciheader(file_).iloc[0]))
+        hdr = get_sciheader(file_)
     except Exception:
         try:
             hdr = fits.getheader(file_)

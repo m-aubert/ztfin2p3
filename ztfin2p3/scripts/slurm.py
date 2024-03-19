@@ -76,9 +76,11 @@ def sbatch(
     show_default=True,
 )
 @click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
-@click.option("--cpu-time", default="2:00:00", help="cputime limit", show_default=True)
-@click.option("--mem", default="8GB", help="memory limit", show_default=True)
-def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem, dry_run):
+@click.option("--cpu-time", default="3:00:00", help="cputime limit", show_default=True)
+@click.option("--mem", default="16GB", help="memory limit", show_default=True)
+@click.option("--force", help="force reprocessing all files?", is_flag=True)
+def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem,
+            dry_run, force):
     """Run d2a for a PERIOD of days on a Slurm cluster."""
 
     dt1d = np.timedelta64(1, "D")
@@ -92,6 +94,8 @@ def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem, d
         for ccdid in range(1, 17):
             date = str(np.datetime64(day) + i * dt1d)
             cmd = f"{ztfcmd} d2a {date} --ccdid {ccdid} --statsdir {statsdir}"
+            if force:
+                cmd += " --force"
             sbatch_cmd = sbatch(
                 f"ztf_d2a_{date}_ccd{ccdid}",
                 cmd,

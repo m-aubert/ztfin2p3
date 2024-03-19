@@ -242,13 +242,17 @@ def d2a(day, ccdid, statsdir, suffix, force):
             try:
                 aper_stats = process_sci(raw_file, flat, bias, newfile_dict)
             except Exception as e:
+                aper_stats = {}
                 status, error_msg = "error", str(e)
                 n_errors += 1
+                timing = time.time() - t0
+                logger.error("sci done, status=%s, %.2f sec.", status, timing)
+                logger.error("error was: %s", error_msg)
             else:
                 status, error_msg = "ok", ""
+                timing = time.time() - t0
+                logger.info("sci done, status=%s, %.2f sec.", status, timing)
 
-            timing = time.time() - t0
-            logger.info("sci done, status=%s, %.2f sec.", status, timing)
             sci_info["files"].append(
                 {
                     "file": raw_file,

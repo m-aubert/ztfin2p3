@@ -13,6 +13,7 @@ import ztfimg
 from ztfquery.buildurl import get_scifile_of_filename
 from . import __version__
 from .io import ipacfilename_to_ztfin2p3filepath
+from .metadata import get_sciheader
 
 
 def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs):
@@ -314,12 +315,15 @@ def build_science_headers(rawfile, ipac_filepaths=None, use_dask=False):
     return new_headers
 
 def exception_header(file_):
-    try : 
-        hdr=fits.getheader(file_)
-        return hdr
-    except Exception as e : 
-        warnings.warn(str(e))
-        return None
+    hdr = None
+    try:
+        hdr = fits.Header(dict(get_sciheader(file_).iloc[0]))
+    except Exception:
+        try:
+            hdr = fits.getheader(file_)
+        except Exception as e:
+            warnings.warn(str(e))
+    return hdr
 
 def store_science_image(new_data, new_headers, new_filenames,
                         use_dask=False,

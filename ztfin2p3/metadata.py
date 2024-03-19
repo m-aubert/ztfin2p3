@@ -18,7 +18,7 @@ def get_sciheader(filename, **kwargs):
     """ """
     # get needed information
     expid = filename_to_metadata(filename).iloc[0]["expid"]
-    info = metadata.parse_filename(filename)
+    info = parse_filename(filename)
     month = f"{info['year']}{info['month']}"
     #
     meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
@@ -170,8 +170,8 @@ def _get_sciheader(month, expid=None, rcid=None, filters=None, **kwargs):
     header_df = metah = _get_sciheader('201904', expid=84831745, rcid=1)
     """
     # filepath
-    sciheader_file = os.path.join( os.path.join(LOCALSOURCE, "meta", "sci"),
-                                   f"metaheader_{month}.parquet")
+    sciheader_file = os.path.join(LOCALSOURCE, "meta", "sci",
+                                  f"metaheader_{month}.parquet")
     # filtering
     if filters is None:
         filters = []

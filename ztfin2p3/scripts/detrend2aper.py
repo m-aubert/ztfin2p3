@@ -1,15 +1,19 @@
-import argparse
 import datetime
 import json
 import logging
+import os
 import pathlib
 import time
+import sys
 
 import numpy as np
+import rich_click as click
 from astropy.io import fits
+from rich.logging import RichHandler
 from ztfimg import CCD
 from ztfquery.buildurl import filename_to_url
 
+from ztfin2p3 import __version__
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
@@ -32,95 +36,176 @@ def daily_datalist(fi):
     return datalist
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="ZTFIN2P3 pipeline : Detrending to Aperture."
+def process_sci(raw_file, flat, bias, newfile_dict):
+    logger = logging.getLogger(__name__)
+    quads, outs = build_science_image(
+        raw_file,
+        flat,
+        bias,
+        dask_level=None,
+        corr_nl=True,
+        corr_overscan=True,
+        overwrite=True,
+        fp_flatfield=False,
+        newfile_dict=newfile_dict,
+        return_sci_quads=True,
+        overscan_prop=dict(userange=[25, 30]),
     )
-    parser.add_argument("day", help="day to process in YYYY-MM-DD format")
-    parser.add_argument(
-        "-c",
-        "--ccdid",
-        required=True,
-        type=int,
-        choices=range(1, 17),
-        help="ccdid in the range 1 to 16",
-    )
-    parser.add_argument(
-        "--period", type=int, default=1, help="number of days to process, 1 = daily"
-    )
-    parser.add_argument(
-        "--statsdir", default="", help="path where statistics are stored (default: cwd)"
-    )
-    parser.add_argument("--suffix", help="suffix for output science files")
-    args = parser.parse_args()
+
+    # If quadrant level :
+    aper_stats = {}
+    for quad, out in zip(quads, outs):
+        # Not using build_aperture_photometry cause it expects
+        # filepath and not images. Will change.
+        logger.info("aperture photometry for quadrant %d", quad.qid)
+        fname_mask = filename_to_url(out, suffix="mskimg.fits.gz", source="local")
+        quad.set_mask(fits.getdata(fname_mask))
+        apcat = get_aperture_photometry(
+            quad,
+            cat="gaia_dr2",
+            dask_level=None,
+            as_path=False,
+            minimal_columns=True,
+            seplimit=20,
+            radius=np.linspace(3, 13),
+            bkgann=None,
+            joined=True,
+            refcat_radius=0.7,
+        )
+        output_filename = ipacfilename_to_ztfin2p3filepath(
+            out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
+        )
+        out = store_aperture_catalog(apcat, output_filename)
+        logger.debug(out)
+        aper_stats[f"quad_{quad.qid}"] = {
+            "quad": quad.qid,
+            "naper": len(apcat),
+            "file": output_filename,
+        }
+
+    return aper_stats
+
+
+@click.command()
+@click.argument("day")
+@click.option(
+    "-c",
+    "--ccdid",
+    required=True,
+    type=click.IntRange(1, 16),
+    help="ccdid in the range 1 to 16",
+)
+@click.option(
+    "--statsdir",
+    default=".",
+    help="path where statistics are stored",
+    show_default=True,
+)
+@click.option("--suffix", help="suffix for output science files")
+@click.option("--force", help="force reprocessing all files?", is_flag=True)
+def d2a(day, ccdid, statsdir, suffix, force):
+    """Detrending to Aperture pipeline for a given day.
+
+    \b
+    Process DAY (must be specified in YYYY-MM-DD format):
+    - computer master bias
+    - computer master flat
+    - for all science exposures, apply master bias and master flat, and run
+      aperture photometry.
+
+    """
 
     logging.basicConfig(
-        level="INFO",
-        format="[%(levelname)s] %(asctime)s %(message)s",
-        datefmt="%H:%M:%S",
-        # handlers=[RichHandler(**handler_opts)],
+        level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
     )
 
-    statsdir = pathlib.Path(args.statsdir)
-    ccdid = args.ccdid
-    day = args.day  # YYYY-MM-D
-    dt1d = np.timedelta64(args.period, "D")
+    statsdir = pathlib.Path(statsdir)
+    # limit period to 1 for now
+    period = 1
+    dt1d = np.timedelta64(period, "D")
     start, end = day, str(np.datetime64(day) + dt1d)
 
-    now = datetime.datetime.now(datetime.UTC).isoformat()
-    stats = {"date": now, "start": start, "end": end, "ccd": ccdid}
+    now = datetime.datetime.now(datetime.UTC)
+    stats = {
+        "date": now.isoformat(),
+        "start": start,
+        "end": end,
+        "ccd": ccdid,
+        "version": __version__,
+    }
     tot = time.time()
 
     logger = logging.getLogger(__name__)
     logger.info("processing day %s, ccd %s", day, ccdid)
-    logger.info("computing bias...")
-    t0 = time.time()
     # Need to rework on the skipping method though.
     bi = BiasPipe.from_period(start, end, ccdid=ccdid, skip=10)
-    bi.build_daily_ccds(
-        corr_nl=True,
-        corr_overscan=True,
-        use_dask=False,
-        axis=0,
-        sigma_clip=3,
-        mergedhow="nanmean",
-        chunkreduction=2,
-        clipping_prop=dict(
-            maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-        ),
-        get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-    )
-    outs = bi.store_ccds(periodicity="daily", incl_header=True, overwrite=True)
-    timing = time.time() - t0
-    logger.info("bias done, %.2f sec.", timing)
-    logger.debug("\n".join(outs))
-    stats["bias"] = {"time": timing, "files": outs}
+    out = bi.get_fileout(ccdid, periodicity="daily", day=day)
+    if os.path.exists(out) and not force:
+        logger.info("bias found")
+        bi.build_daily_ccds(from_file=True, use_dask=False)
+        stats["bias"] = {"time": 0, "files": [out]}
+    else:
+        logger.info("computing bias...")
+        t0 = time.time()
+        bi.build_daily_ccds(
+            corr_nl=True,
+            corr_overscan=True,
+            use_dask=False,
+            axis=0,
+            sigma_clip=3,
+            mergedhow="nanmean",
+            chunkreduction=2,
+            clipping_prop=dict(
+                maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+            ),
+            get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+        )
+        outs = bi.store_ccds(periodicity="daily", incl_header=True, overwrite=True)
+        timing = time.time() - t0
+        logger.info("bias done, %.2f sec.", timing)
+        logger.debug("\n".join(outs))
+        stats["bias"] = {"time": timing, "files": outs}
 
     # Generate flats :
-    logger.info("computing flat...")
-    t0 = time.time()
     fi = FlatPipe.from_period(*bi.period, use_dask=False, ccdid=ccdid)
-    fi.build_daily_ccds(
-        corr_nl=True,
-        use_dask=False,
-        corr_overscan=True,
-        axis=0,
-        apply_bias_period="init",
-        bias_data="daily",
-        sigma_clip=3,
-        mergedhow="nanmean",
-        chunkreduction=2,
-        clipping_prop=dict(
-            maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-        ),
-        get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-        bias=bi,
-    )
-    outs = fi.store_ccds(periodicity="daily_filter", incl_header=True, overwrite=True)
-    timing = time.time() - t0
-    logger.info("flat done, %.2f sec.", timing)
-    logger.debug("\n".join(outs))
-    stats["flat"] = {"time": timing, "files": outs}
+    flat_datalist = daily_datalist(fi)  # Will iterate over flat filters
+    flat_files = [
+        fi.get_fileout(
+            ccdid=row.ccdid, periodicity="daily", day=row.day, filtername=row.filterid
+        )
+        for _, row in flat_datalist.iterrows()
+    ]
+
+    if all(os.path.exists(f) for f in flat_files) and not force:
+        logger.info("flat found")
+        fi.build_daily_ccds(from_file=True, apply_bias_period="init", use_dask=False)
+        stats["flat"] = {"time": 0, "files": []}
+    else:
+        logger.info("computing flat...")
+        t0 = time.time()
+        fi.build_daily_ccds(
+            corr_nl=True,
+            use_dask=False,
+            corr_overscan=True,
+            axis=0,
+            apply_bias_period="init",
+            bias_data="daily",
+            sigma_clip=3,
+            mergedhow="nanmean",
+            chunkreduction=2,
+            clipping_prop=dict(
+                maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+            ),
+            get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+            bias=bi,
+        )
+        outs = fi.store_ccds(
+            periodicity="daily_filter", incl_header=True, overwrite=True
+        )
+        timing = time.time() - t0
+        logger.info("flat done, %.2f sec.", timing)
+        logger.debug("\n".join(outs))
+        stats["flat"] = {"time": timing, "files": outs}
 
     # Generate Science :
     # First browse meta data :
@@ -128,13 +213,13 @@ def main():
     rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
     rawsci_list = rawsci_list.sort_index()
 
-    flat_datalist = daily_datalist(fi)  # Will iterate over flat filters
     bias = bi.get_daily_ccd(day="".join(day.split("-")), ccdid=ccdid)[
         "".join(day.split("-")), ccdid
     ]
 
-    newfile_dict = dict(new_suffix=args.suffix)
+    newfile_dict = dict(new_suffix=suffix)
     stats["science"] = []
+    n_errors = 0
 
     for _, row in flat_datalist.iterrows():
         objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
@@ -154,60 +239,27 @@ def main():
             raw_file = sci_row.filepath
             logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
             t0 = time.time()
-            quads, outs = build_science_image(
-                raw_file,
-                flat,
-                bias,
-                dask_level=None,
-                corr_nl=True,
-                corr_overscan=True,
-                overwrite=True,
-                fp_flatfield=False,
-                newfile_dict=newfile_dict,
-                return_sci_quads=True,
-                overscan_prop=dict(userange=[25, 30]),
-            )
+            try:
+                aper_stats = process_sci(raw_file, flat, bias, newfile_dict)
+            except Exception as e:
+                aper_stats = {}
+                status, error_msg = "error", str(e)
+                n_errors += 1
+                timing = time.time() - t0
+                logger.error("sci done, status=%s, %.2f sec.", status, timing)
+                logger.error("error was: %s", error_msg)
+            else:
+                status, error_msg = "ok", ""
+                timing = time.time() - t0
+                logger.info("sci done, status=%s, %.2f sec.", status, timing)
 
-            # If quadrant level :
-            aper_stats = {}
-            for quad, out in zip(quads, outs):
-                # Not using build_aperture_photometry cause it expects
-                # filepath and not images. Will change.
-                logger.debug("aperture photometry for quadrant %d", quad.qid)
-                fname_mask = filename_to_url(
-                    out, suffix="mskimg.fits.gz", source="local"
-                )
-                quad.set_mask(fits.getdata(fname_mask))
-                apcat = get_aperture_photometry(
-                    quad,
-                    cat="gaia_dr2",
-                    dask_level=None,
-                    as_path=False,
-                    minimal_columns=True,
-                    seplimit=20,
-                    radius=np.linspace(3, 13),
-                    bkgann=None,
-                    joined=True,
-                    refcat_radius=0.7,
-                )
-                output_filename = ipacfilename_to_ztfin2p3filepath(
-                    out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
-                )
-                out = store_aperture_catalog(apcat, output_filename)
-                logger.debug(out)
-                aper_stats[f"quad_{quad.qid}"] = {
-                    "quad": quad.qid,
-                    "naper": len(apcat),
-                    "file": output_filename,
-                }
-
-            timing = time.time() - t0
-            logger.info("sci done, %.2f sec.", timing)
             sci_info["files"].append(
                 {
                     "file": raw_file,
                     "expid": sci_row.expid,
                     "time": timing,
+                    "status": status,
+                    "error_msg": error_msg,
                     **aper_stats,
                 }
             )
@@ -217,10 +269,10 @@ def main():
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
 
-    stats_file = statsdir / f"stats_{day}_{ccdid}.json"
+    stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))
 
-
-if __name__ == "__main__":
-    main()
+    if n_errors > 0:
+        logger.warning("%d sci files failed", n_errors)
+        sys.exit(1)

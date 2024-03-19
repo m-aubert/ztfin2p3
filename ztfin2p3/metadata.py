@@ -1,5 +1,6 @@
 """ Handling metadata """
 
+import warnings
 from .io import LOCALSOURCE
 from ztfquery.buildurl import parse_filename
 
@@ -7,22 +8,40 @@ import os
 import numpy as np
 import pandas
 import dask
+import logging
 
 from astropy import time
+from astropy.io import fits
 
 __all__ = ["get_metadata"]
 
 
 
 def get_sciheader(filename, **kwargs):
-    """ """
     # get needed information
+    logger = logging.getLogger(__name__)
     expid = filename_to_metadata(filename).iloc[0]["expid"]
-    info = metadata.parse_filename(filename)
+    info = parse_filename(filename)
     month = f"{info['year']}{info['month']}"
     #
-    meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
-    return meta_df
+    try:
+        meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
+    except FileNotFoundError:
+        logger.warn("no header file for %s", filename)
+        return
+
+    try:
+        hdr = dict(meta_df.iloc[0])
+    except IndexError:
+        logger.warn("no header for %s", filename)
+        return
+
+    # seems this one was not parsed correctly, remove it ("'")
+    del hdr['SCAMPPTH']
+    # reconstruct header string, so numerical values are parsed by Header
+    hdr_string = "\n".join(f"{k:8s}= {v}" for k, v in hdr.items())
+    hdr = fits.Header.fromstring(hdr_string, sep="\n")
+    return hdr
     
 def filename_to_metadata(filename, kind="raw"):
     """ fetch metadata associated to the given filename 
@@ -170,8 +189,8 @@ def _get_sciheader(month, expid=None, rcid=None, filters=None, **kwargs):
     header_df = metah = _get_sciheader('201904', expid=84831745, rcid=1)
     """
     # filepath
-    sciheader_file = os.path.join( os.path.join(LOCALSOURCE, "meta", "sci"),
-                                   f"metaheader_{month}.parquet")
+    sciheader_file = os.path.join(LOCALSOURCE, "meta", "sci",
+                                  f"metaheader_{month}.parquet")
     # filtering
     if filters is None:
         filters = []

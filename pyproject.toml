@@ -23,6 +23,7 @@ dependencies = [
     "healpy",
     "matplotlib",
     "pandas",
+    "pyarrow",
     "rich-click",
     "scipy",
     "tomli",

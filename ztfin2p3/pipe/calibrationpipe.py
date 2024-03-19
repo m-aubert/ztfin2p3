@@ -389,7 +389,7 @@ class FlatPipe( CalibPipe ):
         warnings.warn('Beware, this correction is only  \
                         applied to daily ccds for no reason')
         
-        if not apply_bias_period in ["daily", "period"]:
+        if apply_bias_period not in ["daily", "period"]:
             raise ValueError()
                 
         datalist = self.init_datafile.copy()
@@ -620,19 +620,31 @@ class FlatPipe( CalibPipe ):
             
             else : 
                 datalist = self.init_datafile.copy()
-                datalist = datalist.reset_index().groupby(["ccdid", "ledid"]).index
+                datalist["filterid"] = datalist["ledid"]
+                for key, items in self._led_to_filter.items(): 
+                    datalist["filterid"] = datalist.filterid.replace(items, key)
+
+                _groupbyk = ['day','ccdid','filterid']
                 datalist = datalist.reset_index()
+                datalist = datalist.groupby(_groupbyk).ledid.apply(list).reset_index()
+                datalist = datalist.reset_index()
+                datalist['ledid'] = None
         
                 data_outs = []
-                for i , row in datalist.iterrows(): 
-                    file_in = self.get_fileout(row.ccdid, 
-                                                periodicity="period",
-                                                ledid=row.ledid)
+                for i, row in datalist.iterrows(): 
+                    file_in = self.get_fileout(ccdid=row.ccdid,
+                                               periodicity="daily",
+                                               day=row.day,
+                                               filtername=row.filterid)
                     ccd = ztfimg.CCD.from_filename(file_in, use_dask=use_dask) 
                     data_outs.append(ccd.get_data(**kwargs))
 
-                self._period_ccds =data_outs
-            
+                # if I understand well, what we store is daily_filter_ccds
+                # (from .store_ccds > .build_daily_filter_ccds) but we need to
+                # put back something in _daily_ccds as well...
+                self._daily_ccds = data_outs
+                # self.daily_filter_ccds_norm = period_filters_norm
+                self.daily_filter_ccds = data_outs
             
             if corr_bias and apply_bias_period != "init" : 
                 ccd_list = self._correct_master_bias(apply_bias_period, **bias_opt)

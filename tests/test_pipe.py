@@ -1,4 +1,3 @@
-import pytest
 
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 
@@ -38,7 +37,9 @@ def test_bias_fileout():
 
 def test_flat_fileout():
     fi = FlatPipe("20190404", ccdid=1)
-    out = fi.init_df[(fi.init_df.ccdid == 1) & (fi.init_df.filterid == "zr")].fileout.iloc[0]
+    out = fi.init_df[
+        (fi.init_df.ccdid == 1) & (fi.init_df.filterid == "zr")
+    ].fileout.iloc[0]
     assert out.endswith(
         "cal/flat/2019/0404/ztfin2p3_20190404_000000_zr_c01_l00_flat.fits"
     )

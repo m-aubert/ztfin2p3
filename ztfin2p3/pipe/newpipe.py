@@ -8,8 +8,7 @@ import numpy as np
 import ztfimg
 
 from .. import io, metadata, __version__
-from ..builder import calib_from_filenames
-from ..builder import calib_from_filenames_withcorr
+from ..builder import calib_from_filenames, calib_from_filenames_withcorr
 
 LED2FILTER = {"zg": [2, 3, 4, 5], "zr": [7, 8, 9, 10], "zi": [11, 12, 13]}
 FILTER2LED = {led: filt for filt, leds in LED2FILTER.items() for led in leds}
@@ -22,7 +21,6 @@ def ensure_path_exists(filename):
 
 
 class CalibPipe:
-
     kind: str = ""
     group_keys: list[str, ...] = ["day", "ccdid"]
 
@@ -126,6 +124,9 @@ class CalibPipe:
         sel = self.init_df.day == day
         if ccdid is not None:
             sel &= self.init_df.ccdid == ccdid
+        for key, val in kwargs.items():
+            if key in self.init_df.columns:
+                sel &= self.init_df[key] == val
 
         index = self.init_df[sel].index
         if index.size > 1:
@@ -136,7 +137,7 @@ class CalibPipe:
         else:
             row = self.init_df.loc[index[0]]
             self.logger.info("loading file %s", row.fileout)
-            return ztfimg.CCD.from_filename(row.fileout).get_data(**kwargs)
+            return ztfimg.CCD.from_filename(row.fileout).get_data()
 
     def build_header(self, row, **kwargs):
         now = datetime.datetime.now().isoformat()

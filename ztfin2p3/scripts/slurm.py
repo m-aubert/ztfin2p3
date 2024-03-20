@@ -79,8 +79,9 @@ def sbatch(
 @click.option("--cpu-time", default="3:00:00", help="cputime limit", show_default=True)
 @click.option("--mem", default="16GB", help="memory limit", show_default=True)
 @click.option("--force", help="force reprocessing all files?", is_flag=True)
-def run_d2a(day, period, statsdir, envpath, account, partition, cpu_time, mem,
-            dry_run, force):
+def run_d2a(
+    day, period, statsdir, envpath, account, partition, cpu_time, mem, dry_run, force
+):
     """Run d2a for a PERIOD of days on a Slurm cluster."""
 
     dt1d = np.timedelta64(1, "D")

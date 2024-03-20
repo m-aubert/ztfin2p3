@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-import os
 import pathlib
 import time
 import sys
@@ -10,11 +9,10 @@ import numpy as np
 import rich_click as click
 from astropy.io import fits
 from rich.logging import RichHandler
-from ztfimg import CCD
 from ztfquery.buildurl import filename_to_url
 
 from ztfin2p3 import __version__
-from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
+from ztfin2p3.aperture import get_aperture_photometry
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
@@ -32,7 +30,6 @@ BIAS_PARAMS = dict(
     ),
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
-
 FLAT_PARAMS = dict(
     corr_nl=True,
     corr_overscan=True,
@@ -44,37 +41,29 @@ FLAT_PARAMS = dict(
     ),
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
+SCI_PARAMS = dict(
+    corr_nl=True,
+    corr_overscan=True,
+    overwrite=True,
+    fp_flatfield=False,
+    return_sci_quads=True,
+    overscan_prop=dict(userange=[25, 30]),
+)
+APER_PARAMS = dict(
+    cat="gaia_dr2",
+    as_path=False,
+    minimal_columns=True,
+    seplimit=20,
+    bkgann=None,
+    joined=True,
+    refcat_radius=0.7,
+)
 
 
-def daily_datalist(fi):
-    # Will probably be implemented in CalibPipe class. Will be cleaner
-    datalist = fi.init_datafile.copy()
-    datalist["filterid"] = datalist["ledid"]
-    for key, items in fi._led_to_filter.items():
-        datalist["filterid"] = datalist.filterid.replace(items, key)
-
-    _groupbyk = ["day", "ccdid", "filterid"]
-    datalist = datalist.reset_index()
-    datalist = datalist.groupby(_groupbyk).ledid.apply(list).reset_index()
-    datalist = datalist.reset_index()
-    datalist["ledid"] = None
-    return datalist
-
-
-def process_sci(raw_file, flat, bias, newfile_dict):
+def process_sci(raw_file, flat, bias, suffix, radius):
     logger = logging.getLogger(__name__)
     quads, outs = build_science_image(
-        raw_file,
-        flat,
-        bias,
-        dask_level=None,
-        corr_nl=True,
-        corr_overscan=True,
-        overwrite=True,
-        fp_flatfield=False,
-        newfile_dict=newfile_dict,
-        return_sci_quads=True,
-        overscan_prop=dict(userange=[25, 30]),
+        raw_file, flat, bias, newfile_dict=dict(new_suffix=suffix), **SCI_PARAMS
     )
 
     # If quadrant level :
@@ -85,23 +74,12 @@ def process_sci(raw_file, flat, bias, newfile_dict):
         logger.info("aperture photometry for quadrant %d", quad.qid)
         fname_mask = filename_to_url(out, suffix="mskimg.fits.gz", source="local")
         quad.set_mask(fits.getdata(fname_mask))
-        apcat = get_aperture_photometry(
-            quad,
-            cat="gaia_dr2",
-            dask_level=None,
-            as_path=False,
-            minimal_columns=True,
-            seplimit=20,
-            radius=np.linspace(3, 13),
-            bkgann=None,
-            joined=True,
-            refcat_radius=0.7,
-        )
+        apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
         output_filename = ipacfilename_to_ztfin2p3filepath(
-            out, new_suffix=newfile_dict["new_suffix"], new_extension="parquet"
+            out, new_suffix=suffix, new_extension="parquet"
         )
-        out = store_aperture_catalog(apcat, output_filename)
-        logger.debug(out)
+        # FIXME: store radius in the catalog file!
+        apcat.to_parquet(output_filename)
         aper_stats[f"quad_{quad.qid}"] = {
             "quad": quad.qid,
             "naper": len(apcat),
@@ -126,9 +104,11 @@ def process_sci(raw_file, flat, bias, newfile_dict):
     help="path where statistics are stored",
     show_default=True,
 )
+@click.option("--radius-min", help="minimum aperture radius", type=int, default=3)
+@click.option("--radius-max", help="maximum aperture radius", type=int, default=12)
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--force", help="force reprocessing all files?", is_flag=True)
-def d2a(day, ccdid, statsdir, suffix, force):
+def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force):
     """Detrending to Aperture pipeline for a given day.
 
     \b
@@ -145,6 +125,7 @@ def d2a(day, ccdid, statsdir, suffix, force):
     )
 
     day = day.replace("-", "")
+    radius = np.arange(radius_min, radius_max)
     statsdir = pathlib.Path(statsdir)
     now = datetime.datetime.now(datetime.UTC)
     stats = {"date": now.isoformat(), "day": day, "ccd": ccdid, "version": __version__}
@@ -173,14 +154,12 @@ def d2a(day, ccdid, statsdir, suffix, force):
     rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
     rawsci_list = rawsci_list.sort_index()
 
-    bias = bi.get_daily_ccd(day=day, ccdid=ccdid)[day, ccdid]
-
-    newfile_dict = dict(new_suffix=suffix)
+    bias = bi.get_ccd(day=day, ccdid=ccdid)
     stats["science"] = []
     n_errors = 0
 
     # iterate over flat filters
-    for _, row in flat_datalist.iterrows():
+    for _, row in fi.init_df.iterrows():
         objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
         nfiles = len(objects_files)
         msg = "processing %s filter=%s ccd=%s: %d files"
@@ -192,14 +171,14 @@ def d2a(day, ccdid, statsdir, suffix, force):
             "nfiles": nfiles,
             "files": [],
         }
-        flat = CCD.from_data(fi.daily_filter_ccds[row["index"]])
+        flat = fi.get_ccd(day=day, ccdid=ccdid, filterid=row.filterid)
 
         for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
             raw_file = sci_row.filepath
             logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
             t0 = time.time()
             try:
-                aper_stats = process_sci(raw_file, flat, bias, newfile_dict)
+                aper_stats = process_sci(raw_file, flat, bias, suffix, radius)
             except Exception as e:
                 aper_stats = {}
                 status, error_msg = "error", str(e)

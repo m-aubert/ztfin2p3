@@ -17,8 +17,33 @@ from ztfin2p3 import __version__
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
-from ztfin2p3.pipe import BiasPipe, FlatPipe
+from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
+
+
+BIAS_PARAMS = dict(
+    corr_nl=True,
+    corr_overscan=True,
+    axis=0,
+    sigma_clip=3,
+    mergedhow="nanmean",
+    clipping_prop=dict(
+        maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+    ),
+    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+)
+
+FLAT_PARAMS = dict(
+    corr_nl=True,
+    corr_overscan=True,
+    axis=0,
+    sigma_clip=3,
+    mergedhow="nanmean",
+    clipping_prop=dict(
+        maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+    ),
+    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+)
 
 
 def daily_datalist(fi):
@@ -119,93 +144,28 @@ def d2a(day, ccdid, statsdir, suffix, force):
         level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
     )
 
+    day = day.replace("-", "")
     statsdir = pathlib.Path(statsdir)
-    # limit period to 1 for now
-    period = 1
-    dt1d = np.timedelta64(period, "D")
-    start, end = day, str(np.datetime64(day) + dt1d)
-
     now = datetime.datetime.now(datetime.UTC)
-    stats = {
-        "date": now.isoformat(),
-        "start": start,
-        "end": end,
-        "ccd": ccdid,
-        "version": __version__,
-    }
+    stats = {"date": now.isoformat(), "day": day, "ccd": ccdid, "version": __version__}
     tot = time.time()
 
     logger = logging.getLogger(__name__)
-    logger.info("processing day %s, ccd %s", day, ccdid)
-    # Need to rework on the skipping method though.
-    bi = BiasPipe.from_period(start, end, ccdid=ccdid, skip=10)
-    out = bi.get_fileout(ccdid, periodicity="daily", day=day)
-    if os.path.exists(out) and not force:
-        logger.info("bias found")
-        bi.build_daily_ccds(from_file=True, use_dask=False)
-        stats["bias"] = {"time": 0, "files": [out]}
-    else:
-        logger.info("computing bias...")
-        t0 = time.time()
-        bi.build_daily_ccds(
-            corr_nl=True,
-            corr_overscan=True,
-            use_dask=False,
-            axis=0,
-            sigma_clip=3,
-            mergedhow="nanmean",
-            chunkreduction=2,
-            clipping_prop=dict(
-                maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-            ),
-            get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-        )
-        outs = bi.store_ccds(periodicity="daily", incl_header=True, overwrite=True)
-        timing = time.time() - t0
-        logger.info("bias done, %.2f sec.", timing)
-        logger.debug("\n".join(outs))
-        stats["bias"] = {"time": timing, "files": outs}
+    logger.info("processing day %s, ccd=%s", day, ccdid)
+    t0 = time.time()
+    bi = BiasPipe(day, ccdid=ccdid, nskip=10)
+    bi.build_ccds(reprocess=force, **BIAS_PARAMS)
+    timing = time.time() - t0
+    logger.info("bias done, %.2f sec.", timing)
+    stats["bias"] = {"time": timing}
 
     # Generate flats :
-    fi = FlatPipe.from_period(*bi.period, use_dask=False, ccdid=ccdid)
-    flat_datalist = daily_datalist(fi)  # Will iterate over flat filters
-    flat_files = [
-        fi.get_fileout(
-            ccdid=row.ccdid, periodicity="daily", day=row.day, filtername=row.filterid
-        )
-        for _, row in flat_datalist.iterrows()
-    ]
-
-    if all(os.path.exists(f) for f in flat_files) and not force:
-        logger.info("flat found")
-        fi.build_daily_ccds(from_file=True, apply_bias_period="init", use_dask=False)
-        stats["flat"] = {"time": 0, "files": []}
-    else:
-        logger.info("computing flat...")
-        t0 = time.time()
-        fi.build_daily_ccds(
-            corr_nl=True,
-            use_dask=False,
-            corr_overscan=True,
-            axis=0,
-            apply_bias_period="init",
-            bias_data="daily",
-            sigma_clip=3,
-            mergedhow="nanmean",
-            chunkreduction=2,
-            clipping_prop=dict(
-                maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-            ),
-            get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-            bias=bi,
-        )
-        outs = fi.store_ccds(
-            periodicity="daily_filter", incl_header=True, overwrite=True
-        )
-        timing = time.time() - t0
-        logger.info("flat done, %.2f sec.", timing)
-        logger.debug("\n".join(outs))
-        stats["flat"] = {"time": timing, "files": outs}
+    fi = FlatPipe(day, ccdid=ccdid)
+    t0 = time.time()
+    fi.build_ccds(bias=bi, reprocess=force, **FLAT_PARAMS)
+    timing = time.time() - t0
+    logger.info("flat done, %.2f sec.", timing)
+    stats["flat"] = {"time": timing}
 
     # Generate Science :
     # First browse meta data :
@@ -213,14 +173,13 @@ def d2a(day, ccdid, statsdir, suffix, force):
     rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
     rawsci_list = rawsci_list.sort_index()
 
-    bias = bi.get_daily_ccd(day="".join(day.split("-")), ccdid=ccdid)[
-        "".join(day.split("-")), ccdid
-    ]
+    bias = bi.get_daily_ccd(day=day, ccdid=ccdid)[day, ccdid]
 
     newfile_dict = dict(new_suffix=suffix)
     stats["science"] = []
     n_errors = 0
 
+    # iterate over flat filters
     for _, row in flat_datalist.iterrows():
         objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
         nfiles = len(objects_files)

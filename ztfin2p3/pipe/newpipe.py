@@ -1,11 +1,11 @@
 import datetime
+import itertools
 import logging
 import os
-import warnings
 
-from astropy.io import fits
 import numpy as np
-import ztfimg
+from astropy.io import fits
+from ztfimg import CCD, __version__ as ztfimg_version
 
 from .. import io, metadata, __version__
 from ..builder import calib_from_filenames, calib_from_filenames_withcorr
@@ -27,6 +27,7 @@ class CalibPipe:
     def __init__(
         self,
         period: str | tuple[str, str],
+        keep_rawmeta: bool = False,
         nskip: int | None = None,
         use_dask: bool = False,
         **kwargs,
@@ -36,27 +37,28 @@ class CalibPipe:
         self.logger = logging.getLogger(__name__)
         self.period = period
         self.use_dask = use_dask
-        self.ccds: list[ztfimg.CCD] = []
 
-        self.df = metadata.get_rawmeta(
+        rawmeta = metadata.get_rawmeta(
             self.kind, self.period, add_filepath=True, use_dask=use_dask, **kwargs
         )
-        self.init_df = (
-            self.df.groupby(self.group_keys)["filepath"].apply(list).reset_index()
-        )
-        self.init_df["fileout"] = self.init_df.apply(
+        if keep_rawmeta:
+            self.rawmeta = rawmeta
+
+        self.df = rawmeta.groupby(self.group_keys)["filepath"].apply(list).reset_index()
+        self.df["fileout"] = self.df.apply(
             lambda row: io.get_daily_biasfile(row.day, row.ccdid), axis=1
         )
+        self.df["ccd"] = None
 
         if nskip is not None:
-            self.init_df["filepath"] = self.init_df["filepath"].map(lambda x: x[nskip:])
+            self.df["filepath"] = self.df["filepath"].map(lambda x: x[nskip:])
             # Fix patch in case whacky data acquisition (e.g only 1 bias file)
             # requires at least two bias data for the pipeline to run "smoothly"
-            n_files = self.init_df.filepath.map(len)
+            n_files = self.df.filepath.map(len)
             good = n_files > 2
             if not good.all():
-                warnings.warn("Days with less than two raw images were removed.")
-                self.init_df = self.init_df[good].reset_index(drop=True)
+                self.logger.warning("Days with less than two raw images were removed.")
+                self.df = self.df[good].reset_index(drop=True)
 
     def build_ccds(
         self,
@@ -84,8 +86,7 @@ class CalibPipe:
             ztfimg.collection.ImageCollection.get_meandata()
 
         """
-        self.ccds = []
-        for _, row in self.init_df.iterrows():
+        for i, row in self.df.iterrows():
             filename = row.fileout
             if reprocess or not os.path.exists(filename):
                 self.logger.info("processing %s %s", self.kind, row.day)
@@ -102,55 +103,57 @@ class CalibPipe:
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             else:
                 self.logger.info("loading file %s", filename)
-                data = ztfimg.CCD.from_filename(filename).get_data()
-            self.ccds.append(data)
+                data = CCD.from_filename(filename).get_data()
+            self.df.at[i, "ccd"] = data
 
-    def store_ccds(self, overwrite: bool = True, **kwargs) -> list[str]:
+    def store_ccds(self, overwrite: bool = True, **kwargs):
         """Store created ccds.
         Extra arguments are passed to `fits.writeto`.
-
         """
-        outs = []
-        for i, row in self.init_df.iterrows():
-            data = self.ccds[i]
+        for i, row in self.df.iterrows():
             hdr = self.build_header(row)
             ensure_path_exists(row.fileout)
-            fits.writeto(row.fileout, data, header=hdr, overwrite=overwrite, **kwargs)
-            outs.append(row.fileout)
-
-        return outs
+            fits.writeto(
+                row.fileout, row.ccd, header=hdr, overwrite=overwrite, **kwargs
+            )
 
     def get_ccd(self, day: str, ccdid: int = None, **kwargs):
-        sel = self.init_df.day == day
+        sel = self.df.day == day
         if ccdid is not None:
-            sel &= self.init_df.ccdid == ccdid
+            sel &= self.df.ccdid == ccdid
         for key, val in kwargs.items():
-            if key in self.init_df.columns:
-                sel &= self.init_df[key] == val
+            if key in self.df.columns:
+                sel &= self.df[key] == val
 
-        index = self.init_df[sel].index
-        if index.size > 1:
+        idx = self.df.index[sel]
+        if len(idx) == 0:
+            raise ValueError("not found")
+        elif len(idx) > 1:
             raise ValueError("selection is not unique")
 
-        if self.ccds:
-            return self.ccds[index[0]]
-        else:
-            row = self.init_df.loc[index[0]]
+        row = self.df.loc[idx[0]]
+        if row.ccd is None:
             self.logger.info("loading file %s", row.fileout)
-            return ztfimg.CCD.from_filename(row.fileout).get_data()
+            self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout).get_data()
+        return self.df.loc[idx[0]].ccd
 
     def build_header(self, row, **kwargs):
         now = datetime.datetime.now().isoformat()
+        # flatten file list if needed
+        flist = row.filepath
+        nframes = len(
+            list(itertools.chain(*flist)) if isinstance(flist, list) else flist
+        )
         meta = {
             "IMGTYPE": self.kind,
-            "NFRAMES": len(row.filepath),
+            "NFRAMES": nframes,
             "NDAYS": 1,
             "PTYPE": "daily",
             "PERIOD": row.day,
             "CCDID": row.ccdid,
             "PIPELINE": ("ZTFIN2P3", "image processing pipeline"),
             "PIPEV": (__version__, "ztfin2p3 pipeline version"),
-            "ZTFIMGV": (ztfimg.__version__, "ztfimg pipeline version"),
+            "ZTFIMGV": (ztfimg_version, "ztfimg pipeline version"),
             "PIPETIME": (now, "ztfin2p3 file creation"),
             **kwargs,
         }
@@ -170,21 +173,19 @@ class FlatPipe(CalibPipe):
     def __init__(
         self,
         period: str | tuple[str, str],
+        keep_rawmeta: bool = False,
         nskip: int | None = None,
         use_dask: bool = False,
         **kwargs,
     ):
-        super().__init__(period=period, nskip=nskip, use_dask=use_dask, **kwargs)
-
+        super().__init__(
+            period, keep_rawmeta=keep_rawmeta, nskip=nskip, use_dask=use_dask, **kwargs
+        )
         # Add filterid (grouping by LED)
-        self.init_df["filterid"] = self.init_df.ledid.map(lambda x: FILTER2LED[x])
+        self.df["filterid"] = self.df.ledid.map(lambda x: FILTER2LED[x])
         _groupbyk = ["day", "ccdid", "filterid"]
-        self.init_df = self.init_df.groupby(_groupbyk).aggregate(list).reset_index()
-        # self.init_df.filepath = self.init_df.filepath.map(
-        #     lambda x: list(itertools.chain(*x))
-        # )
-
-        self.init_df.fileout = self.init_df.apply(
+        self.df = self.df.groupby(_groupbyk).aggregate(list).reset_index()
+        self.df.fileout = self.df.apply(
             lambda row: io.get_daily_flatfile(
                 row.day, row.ccdid, filtername=row.filterid
             ),
@@ -227,11 +228,10 @@ class FlatPipe(CalibPipe):
             ztfimg.collection.ImageCollection.get_meandata()
 
         """
-        self.ccds = []
         if weights is None:
             weights = dict(zg=None, zr=None, zi=None)
 
-        for _, row in self.init_df.iterrows():
+        for i, row in self.df.iterrows():
             filename = row.fileout
             if reprocess or not os.path.exists(filename):
                 self.logger.info(
@@ -250,9 +250,8 @@ class FlatPipe(CalibPipe):
                         **kwargs,
                     )
                     if normalize:
-                        norm = np.nanmedian(data)
+                        norms.append(norm := np.nanmedian(data))
                         data /= norm
-                        norms.append(norm)
                     arrays.append(data)
 
                 data = np.average(arrays, weights=weights[row.filterid], axis=0)
@@ -268,8 +267,8 @@ class FlatPipe(CalibPipe):
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             else:
                 self.logger.info("loading file %s", filename)
-                data = ztfimg.CCD.from_filename(filename).get_data()
-            self.ccds.append(data)
+                data = CCD.from_filename(filename).get_data()
+            self.df.at[i, "ccd"] = data
 
     def build_header(self, row, **kwargs):
         ledid = row.ledid if isinstance(row.ledid, int) else None

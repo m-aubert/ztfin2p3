@@ -159,7 +159,7 @@ def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force):
     n_errors = 0
 
     # iterate over flat filters
-    for _, row in fi.init_df.iterrows():
+    for _, row in fi.df.iterrows():
         objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
         nfiles = len(objects_files)
         msg = "processing %s filter=%s ccd=%s: %d files"

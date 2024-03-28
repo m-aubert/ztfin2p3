@@ -335,7 +335,7 @@ class CalibrationBuilder( object ): # /day /week /month
         return get_meandata(datas, **prop)
     
 
-    def build(self, corr_nl=True, corr_overscan=True,
+    def build(self, corr_nl=True, corr_overscan=True, corr_pocket=False,
                   set_it=False, incl_header=False,
                   header_keys=None, chunkreduction=2,
                   dask_on_header=False, get_data_props={}, **kwargs):
@@ -350,6 +350,9 @@ class CalibrationBuilder( object ): # /day /week /month
             Should the data be corrected for overscan
             (if both corr_overscan and corr_nl are true,
             corr_nl is applied first)
+
+        corr_pocket: bool
+            Should data be corrected for the pocket effect
 
         chunkreduction: int
             rechunk and split of the image.
@@ -385,7 +388,9 @@ class CalibrationBuilder( object ): # /day /week /month
         
         # This could be updated in the calibration function #
             
-        data =self.imgcollection.get_data(**dict(corr_overscan=corr_overscan, corr_nl=corr_nl), **get_data_props)
+        data =self.imgcollection.get_data(
+            corr_overscan=corr_overscan, corr_nl=corr_nl, corr_pocket=corr_pocket,
+            **get_data_props)
         
         data = get_meandata(data,chunkreduction=chunkreduction, **kwargs) 
         
@@ -402,7 +407,7 @@ class CalibrationBuilder( object ): # /day /week /month
         return data, header
     
     
-    def build_with_corr(self, corr_nl=True, corr_overscan=True,
+    def build_with_corr(self, corr_nl=True, corr_overscan=True, corr_pocket=False,
                   corr = None, set_it=False, incl_header=False,
                   header_keys=None, chunkreduction=2,
                   dask_on_header=False, get_data_props={}, **kwargs):
@@ -417,6 +422,9 @@ class CalibrationBuilder( object ): # /day /week /month
             Should the data be corrected for overscan
             (if both corr_overscan and corr_nl are true,
             corr_nl is applied first)
+
+        corr_pocket: bool
+            Should data be corrected for the pocket effect
 
         chunkreduction: int
             rechunk and split of the image.
@@ -454,11 +462,14 @@ class CalibrationBuilder( object ): # /day /week /month
         
         if corr is None : 
             return self.build(corr_nl=corr_nl, corr_overscan=corr_overscan,
+                  corr_pocket=corr_pocket,
                   set_it=set_it, incl_header=incl_header,
                   header_keys=header_keys, chunkreduction=2,
                   dask_on_header=dask_on_header,  get_data_props={},**kwargs)
                     
-        prop_data = {**get_data_props, **dict(corr_overscan=corr_overscan, corr_nl=corr_nl)}
+        prop_data = {**get_data_props,
+                     **dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 
+                            corr_pocket=corr_pocket,)}
         prop = {**dict(chunkreduction=chunkreduction),  **kwargs}
         
         if incl_header:

@@ -195,8 +195,9 @@ class FlatPipe(CalibPipe):
     def build_ccds(
         self,
         bias: BiasPipe | None = None,
-        corr_overscan: bool = True,
         corr_nl: bool = True,
+        corr_overscan: bool = True,
+        corr_pocket: bool = True,
         normalize: bool = True,
         reprocess: bool = False,
         save: bool = True,
@@ -245,8 +246,9 @@ class FlatPipe(CalibPipe):
                     data = calib_from_filenames_withcorr(
                         led_filelist,
                         corr=bias_data,
-                        corr_overscan=corr_overscan,
                         corr_nl=corr_nl,
+                        corr_overscan=corr_overscan,
+                        corr_pocket=corr_pocket,
                         **kwargs,
                     )
                     if normalize:

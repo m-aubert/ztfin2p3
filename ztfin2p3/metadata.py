@@ -1,17 +1,18 @@
 """ Handling metadata """
 
-import warnings
-from .io import LOCALSOURCE
-from ztfquery.buildurl import parse_filename
-
+import logging
 import os
+import warnings
+
+import dask
 import numpy as np
 import pandas
-import dask
-import logging
-
 from astropy import time
 from astropy.io import fits
+from ztfquery.buildurl import parse_filename
+
+from .io import LOCALSOURCE
+from .utils.tools import parse_singledate
 
 __all__ = ["get_metadata"]
 
@@ -214,7 +215,6 @@ def download_metadata(kind="raw", year_range=[2018, 2024], use_dask=False, overw
     """ """
     from ztfquery import query
     from datetime import datetime
-    from .io import LOCALSOURCE
     if use_dask:
         import dask
 
@@ -441,13 +441,12 @@ class MetaDataHandler( object ):
         if not hasattr(date, "__iter__"): # int/float given, convert to string
             date = str(date)
 
-        if type(date) is str and len(date) == 6: # means per month as stored.
+        if isinstance(date, str) and len(date) == 6: # means per month as stored.
             return cls.get_monthly_metadata(date[:4],date[4:])
         
-        elif type(date) is str:
+        elif isinstance(date, str):
             start, end = parse_singledate(date) # -> start, end
         else:
-            from astropy import time 
             start, end = time.Time(date).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
@@ -518,7 +517,6 @@ class MetaDataHandler( object ):
         elif type(date) is str:
             start, end = parse_singledate(date) # -> start, end
         else:
-            from astropy import time 
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
@@ -591,7 +589,6 @@ class RawMetaData( MetaDataHandler ):
             raise NotImplementedError("you must define cls._SUBKIND")
         
         year, month = int(year), int(month)
-        from astropy import time
         from ztfquery import query
         fileout = cls.get_monthly_metadatafile(year, month)
         
@@ -663,7 +660,6 @@ class RawFlatMetaData( RawMetaData ):
         """ """
         year, month = int(year), int(month)
         from ztfquery import io
-        from astropy.io import fits
         def getval_from_header(filename, value, ext=None, **kwargs):
             """ """
             return fits.getval(io.get_file(filename, **kwargs),  value, ext=ext)
@@ -694,8 +690,6 @@ class RawFlatMetaData( RawMetaData ):
     
     @staticmethod
     def _add_ledinfo_to_datafile(data, use_dask=True): 
-        from astropy.io import fits
-        
         getfunc = fits.getval
         
         if use_dask :

@@ -4,6 +4,7 @@ import logging
 import pathlib
 import time
 import sys
+from typing import Any
 
 import numpy as np
 import rich_click as click
@@ -62,6 +63,14 @@ APER_PARAMS = dict(
 )
 
 
+def _run_pdb(type, value, tb) -> None:  # pragma: no cover
+    import pdb
+    import traceback
+
+    traceback.print_exception(type, value, tb)
+    pdb.pm()
+
+
 def process_sci(raw_file, flat, bias, suffix, radius):
     logger = logging.getLogger(__name__)
     quads, outs = build_science_image(
@@ -109,8 +118,10 @@ def process_sci(raw_file, flat, bias, suffix, radius):
 @click.option("--radius-min", help="minimum aperture radius", type=int, default=3)
 @click.option("--radius-max", help="maximum aperture radius", type=int, default=12)
 @click.option("--suffix", help="suffix for output science files")
-@click.option("--force", help="force reprocessing all files?", is_flag=True)
-def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force):
+@click.option("--force", is_flag=True, help="force reprocessing all files?")
+@click.option("--debug", is_flag=True, help="show debug info?")
+@click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
+def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force, debug, pdb):
     """Detrending to Aperture pipeline for a given day.
 
     \b
@@ -122,8 +133,23 @@ def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force):
 
     """
 
+    handler_opts: dict[str, Any] = dict(markup=False, rich_tracebacks=True)
+    if debug:
+        level = "DEBUG"
+        handler_opts.update(dict(show_time=True, show_path=True))
+        pdb = True
+    else:
+        level = "INFO"
+        handler_opts.update(dict(show_time=True, show_path=False))
+
+    if pdb:
+        sys.excepthook = _run_pdb
+
     logging.basicConfig(
-        level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(**handler_opts)],
     )
 
     day = day.replace("-", "")

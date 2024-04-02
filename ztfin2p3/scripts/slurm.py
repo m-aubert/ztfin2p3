@@ -8,6 +8,7 @@ import rich_click as click
 def sbatch(
     job_name,
     cmd,
+    array=None,
     cpus=1,
     cpu_time="02:00:00",
     mem="4GB",
@@ -32,6 +33,8 @@ def sbatch(
 
     if account:
         sbatch += f" --account={account}"
+    if array:
+        sbatch += f" --array={array}"
     if email:
         sbatch += f" --mail-user={email} --mail-type=BEGIN,END"
     if output:
@@ -63,8 +66,8 @@ def sbatch(
     "--partition", default="htc", help="partition for the resource allocation"
 )
 @click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
-@click.option("--cpu-time", default="3:00:00", help="cputime limit")
-@click.option("--mem", default="16GB", help="memory limit")
+@click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
+@click.option("--mem", "-m", default="8GB", help="memory limit")
 @click.option("--force", help="force reprocessing all files?", is_flag=True)
 def run_d2a(
     day,
@@ -94,24 +97,24 @@ def run_d2a(
 
     for day in days:
         date = str(day.date())
-        for ccdid in range(1, 17):
-            cmd = f"{ztfcmd} d2a {date} --ccdid {ccdid} --statsdir {statsdir}"
-            cmd += f" --steps {steps}"
-            if force:
-                cmd += " --force"
-            sbatch_cmd = sbatch(
-                f"ztf_d2a_{date.replace(" - ", " ")}_ccd{ccdid}",
-                cmd,
-                cpu_time=cpu_time,
-                mem=mem,
-                account=account,
-                partition=partition,
-                output=os.path.join(statsdir, "slurm-%j.log"),
+        cmd = f"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
+        cmd += f" --statsdir {statsdir} --steps {steps}"
+        if force:
+            cmd += " --force"
+        sbatch_cmd = sbatch(
+            f"ztf_d2a_{date.replace('-', '')}",
+            cmd,
+            array="1-16",
+            cpu_time=cpu_time,
+            mem=mem,
+            account=account,
+            partition=partition,
+            output=os.path.join(statsdir, "slurm-%A-%a.log"),
+        )
+        if dry_run:
+            print(sbatch_cmd)
+        else:
+            out = subprocess.check_output(
+                sbatch_cmd, shell=True, stderr=subprocess.STDOUT
             )
-            if dry_run:
-                print(sbatch_cmd)
-            else:
-                out = subprocess.check_output(
-                    sbatch_cmd, shell=True, stderr=subprocess.STDOUT
-                )
-                print(out.decode().splitlines()[-1])
+            print(out.decode().splitlines()[-1])

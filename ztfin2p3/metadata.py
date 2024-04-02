@@ -644,9 +644,13 @@ class RawFlatMetaData( RawMetaData ):
         dataframe (IRSA metadata)
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
-        if not 'ledid' in data.columns : 
-            data = cls._add_ledinfo_to_datafile(data, **kwargs)
-        
+        if 'ledid' not in data.columns:
+            try:
+                data = cls._add_ledinfo_to_datafile(data, **kwargs)
+            except FileNotFoundError as exc:
+                warnings.warn(f"could not get ledid for {date}: {exc}", UserWarning)
+                data['ledid'] = -1
+
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
             

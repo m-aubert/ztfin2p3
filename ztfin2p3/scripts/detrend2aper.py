@@ -100,7 +100,7 @@ def process_sci(raw_file, flat, bias, suffix, radius):
     return aper_stats
 
 
-@click.command()
+@click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option(
     "-c",
@@ -109,17 +109,12 @@ def process_sci(raw_file, flat, bias, suffix, radius):
     type=click.IntRange(1, 16),
     help="ccdid in the range 1 to 16",
 )
-@click.option(
-    "--statsdir",
-    default=".",
-    help="path where statistics are stored",
-    show_default=True,
-)
-@click.option("--radius-min", help="minimum aperture radius", type=int, default=3)
-@click.option("--radius-max", help="maximum aperture radius", type=int, default=12)
+@click.option("--statsdir", default=".", help="path where statistics are stored")
+@click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
+@click.option("--radius-max", type=int, default=12, help="maximum aperture radius")
 @click.option("--suffix", help="suffix for output science files")
-@click.option("--force", is_flag=True, help="force reprocessing all files?")
-@click.option("--debug", is_flag=True, help="show debug info?")
+@click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
+@click.option("--debug", "-d", is_flag=True, help="show debug info?")
 @click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
 def d2a(day, ccdid, statsdir, radius_min, radius_max, suffix, force, debug, pdb):
     """Detrending to Aperture pipeline for a given day.

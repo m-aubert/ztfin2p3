@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-import numpy as np
+import pandas as pd
 import rich_click as click
 
 
@@ -27,78 +27,64 @@ def sbatch(
     else:
         gpuarg = ""
 
-    cmd = (
-        f"sbatch -p {partition} -J {job_name} {gpuarg}"
-        f' -c {cpus} -t {cpu_time} --mem {mem} --wrap "{cmd}"'
-    )
+    sbatch = f"sbatch -p {partition} -J {job_name} {gpuarg}"
+    sbatch += f" -c {cpus} -t {cpu_time} --mem {mem}"
+
     if account:
-        cmd += f" --account={account}"
+        sbatch += f" --account={account}"
     if email:
-        cmd += f" --mail-user={email} --mail-type=BEGIN,END"
+        sbatch += f" --mail-user={email} --mail-type=BEGIN,END"
     if output:
-        cmd += f" -o {output}"
+        sbatch += f" -o {output}"
+
+    sbatch += f' --wrap "{cmd}"'
 
     if debug:
-        print(cmd)
+        print(sbatch)
 
-    return cmd
+    return sbatch
 
 
-@click.command()
+@click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option(
-    "--period",
-    type=int,
-    default=1,
-    help="number of days to process",
-    show_default=True,
+    "--to", help="specify the end of the period to process, default to one day"
 )
+@click.option("--steps", default="bias,flat,sci,aper", help="steps to run")
+@click.option("--statsdir", default=".", help="path where statistics are stored")
+@click.option("--envpath", help="path to the environment where ztfin2p3 is located")
+@click.option("--account", default="ztf", help="account to charge resources to")
 @click.option(
-    "--statsdir",
-    default=".",
-    help="path where statistics are stored",
-    show_default=True,
-)
-@click.option(
-    "--envpath",
-    help="path to the environment where ztfin2p3 is located",
-)
-@click.option(
-    "--account",
-    default="ztf",
-    help="account to charge resources to",
-    show_default=True,
-)
-@click.option(
-    "--partition",
-    default="htc",
-    help="partition for the resource allocation",
-    show_default=True,
+    "--partition", default="htc", help="partition for the resource allocation"
 )
 @click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
-@click.option("--cpu-time", default="3:00:00", help="cputime limit", show_default=True)
-@click.option("--mem", default="16GB", help="memory limit", show_default=True)
+@click.option("--cpu-time", default="3:00:00", help="cputime limit")
+@click.option("--mem", default="16GB", help="memory limit")
 @click.option("--force", help="force reprocessing all files?", is_flag=True)
 def run_d2a(
-    day, period, statsdir, envpath, account, partition, cpu_time, mem, dry_run, force
+    day, to, steps, statsdir, envpath, account, partition, cpu_time, mem, dry_run, force
 ):
-    """Run d2a for a PERIOD of days on a Slurm cluster."""
+    """Run d2a for a DAY or a period on a Slurm cluster."""
 
-    dt1d = np.timedelta64(1, "D")
+    if to is not None:
+        days = pd.date_range(day, to)
+    else:
+        days = pd.date_range(day, day)
 
     if envpath:
         ztfcmd = f"{envpath}/bin/ztfin2p3"
     else:
         ztfcmd = "ztfin2p3"
 
-    for i in range(period):
+    for day in days:
+        date = str(day.date())
         for ccdid in range(1, 17):
-            date = str(np.datetime64(day) + i * dt1d)
             cmd = f"{ztfcmd} d2a {date} --ccdid {ccdid} --statsdir {statsdir}"
+            cmd += f" --steps {steps}"
             if force:
                 cmd += " --force"
             sbatch_cmd = sbatch(
-                f"ztf_d2a_{date}_ccd{ccdid}",
+                f"ztf_d2a_{date.replace(" - ", " ")}_ccd{ccdid}",
                 cmd,
                 cpu_time=cpu_time,
                 mem=mem,

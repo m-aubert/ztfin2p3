@@ -50,6 +50,11 @@ def sbatch(
 @click.option(
     "--to", help="specify the end of the period to process, default to one day"
 )
+@click.option(
+    "--freq",
+    default="D",
+    help="frequency for date range, D=daily, W=weekly, M=monthly, etc.",
+)
 @click.option("--steps", default="bias,flat,sci,aper", help="steps to run")
 @click.option("--statsdir", default=".", help="path where statistics are stored")
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
@@ -62,12 +67,23 @@ def sbatch(
 @click.option("--mem", default="16GB", help="memory limit")
 @click.option("--force", help="force reprocessing all files?", is_flag=True)
 def run_d2a(
-    day, to, steps, statsdir, envpath, account, partition, cpu_time, mem, dry_run, force
+    day,
+    to,
+    freq,
+    steps,
+    statsdir,
+    envpath,
+    account,
+    partition,
+    cpu_time,
+    mem,
+    dry_run,
+    force,
 ):
     """Run d2a for a DAY or a period on a Slurm cluster."""
 
     if to is not None:
-        days = pd.date_range(day, to)
+        days = pd.date_range(day, to, freq=freq)
     else:
         days = pd.date_range(day, day)
 

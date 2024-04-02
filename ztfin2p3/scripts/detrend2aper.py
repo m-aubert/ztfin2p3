@@ -215,9 +215,12 @@ def d2a(day, ccdid, steps, statsdir, radius_min, radius_max, suffix, force, debu
                     aper_stats = process_sci(
                         raw_file, flat, bias, suffix, radius, do_aper=do_aper
                     )
-                except Exception as e:
+                except Exception as exc:
+                    if pdb:
+                        raise
+
                     aper_stats = {}
-                    status, error_msg = "error", str(e)
+                    status, error_msg = "error", str(exc)
                     n_errors += 1
                     timing = time.time() - t0
                     logger.error("sci done, status=%s, %.2f sec.", status, timing)

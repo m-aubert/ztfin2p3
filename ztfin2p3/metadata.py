@@ -645,15 +645,11 @@ class RawFlatMetaData( RawMetaData ):
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
         if 'ledid' not in data.columns:
-            try:
-                data = cls._add_ledinfo_to_datafile(data, **kwargs)
-            except FileNotFoundError as exc:
-                warnings.warn(f"could not get ledid for {date}: {exc}", UserWarning)
-                data['ledid'] = -1
+            data = cls._add_ledinfo_to_datafile(data, **kwargs)
 
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
-            
+
         return data
     
     # ================= #
@@ -694,19 +690,25 @@ class RawFlatMetaData( RawMetaData ):
     
     @staticmethod
     def _add_ledinfo_to_datafile(data, use_dask=True): 
-        getfunc = fits.getval
-        
+
+        def _get_ledid(fname):
+            try:
+                return fits.getval(fname, 'ILUM_LED')
+            except FileNotFoundError as exc:
+                warnings.warn(f"could not get ledid: {exc}", UserWarning)
+                return -1
+
         if use_dask :
             import dask
-            getfunc = dask.delayed(fits.getval)
-        
-        file_to_led = data.filepath.map(lambda x : getfunc(x, 'ILUM_LED'))
-        
+            _get_ledid = dask.delayed(_get_ledid)
+
+        file_to_led = data.filepath.map(_get_ledid)
+
         if use_dask : 
             data['ledid'] = dask.compute(*file_to_led)
         else : 
             data['ledid'] = file_to_led
-        
+
         return data
              
 class RawBiasMetaData( RawMetaData ):

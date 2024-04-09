@@ -23,6 +23,8 @@ dependencies = [
     "healpy",
     "matplotlib",
     "pandas",
+    "pyarrow",
+    "rich-click",
     "scipy",
     "tomli",
     "ztfimg>=0.12.0",
@@ -37,7 +39,7 @@ all = ["HMpTy", "htmcatalog", "paramiko", "scp", "scikit-sparse"]
 Repository = "https://github.com/MickaelRigault/ztfin2p3"
 
 [project.scripts]
-ztfin2p3-d2a = "ztfin2p3.scripts.detrend2aper:main"
+ztfin2p3 = "ztfin2p3.__main__:cli"
 
 [tool.setuptools]
 package-dir = {"" = "."}
@@ -48,3 +50,11 @@ version = {attr = "ztfin2p3.__version__"}
 
 [tool.setuptools.package-data]
 ztfin2p3 = ["config/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "docs"]
+filterwarnings = [
+    # action:message:category:module:lineno
+    # "error",
+    "ignore:.*Dask DataFrame implementation is deprecated.*:DeprecationWarning",
+]

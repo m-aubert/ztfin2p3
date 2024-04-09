@@ -1,28 +1,48 @@
 """ Handling metadata """
 
-from .io import LOCALSOURCE
-from ztfquery.buildurl import parse_filename
-
+import logging
 import os
+import warnings
+
+import dask
 import numpy as np
 import pandas
-import dask
-
 from astropy import time
+from astropy.io import fits
+from ztfquery.buildurl import parse_filename
+
+from .io import LOCALSOURCE
+from .utils.tools import parse_singledate
 
 __all__ = ["get_metadata"]
 
 
 
 def get_sciheader(filename, **kwargs):
-    """ """
     # get needed information
+    logger = logging.getLogger(__name__)
     expid = filename_to_metadata(filename).iloc[0]["expid"]
-    info = metadata.parse_filename(filename)
+    info = parse_filename(filename)
     month = f"{info['year']}{info['month']}"
     #
-    meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
-    return meta_df
+    try:
+        meta_df = _get_sciheader(month, expid=expid, rcid=info["rcid"], **kwargs)
+    except FileNotFoundError:
+        logger.warn("no header file for %s", filename)
+        return
+
+    try:
+        hdr = dict(meta_df.iloc[0])
+    except IndexError:
+        logger.warn("no header for %s", filename)
+        return
+
+    # seems this one was not parsed correctly, remove it ("'")
+    del hdr['SCAMPPTH']
+    # reconstruct header string, so numerical values are parsed by Header
+    hdr_string = "\n".join(f"{k:8s}= {v}" for k, v in hdr.items())
+    hdr = fits.Header.fromstring(hdr_string, sep="\n")
+    return hdr
     
 def filename_to_metadata(filename, kind="raw"):
     """ fetch metadata associated to the given filename 
@@ -171,8 +191,8 @@ def _get_sciheader(month, expid=None, rcid=None, filters=None, **kwargs):
     header_df = metah = _get_sciheader('201904', expid=84831745, rcid=1)
     """
     # filepath
-    sciheader_file = os.path.join( os.path.join(LOCALSOURCE, "meta", "sci"),
-                                   f"metaheader_{month}.parquet")
+    sciheader_file = os.path.join(LOCALSOURCE, "meta", "sci",
+                                  f"metaheader_{month}.parquet")
     # filtering
     if filters is None:
         filters = []
@@ -196,7 +216,6 @@ def download_metadata(kind="raw", year_range=[2018, 2024], use_dask=False, overw
     """ """
     from ztfquery import query
     from datetime import datetime
-    from .io import LOCALSOURCE
     if use_dask:
         import dask
 
@@ -423,13 +442,12 @@ class MetaDataHandler( object ):
         if not hasattr(date, "__iter__"): # int/float given, convert to string
             date = str(date)
 
-        if type(date) is str and len(date) == 6: # means per month as stored.
+        if isinstance(date, str) and len(date) == 6: # means per month as stored.
             return cls.get_monthly_metadata(date[:4],date[4:])
         
-        elif type(date) is str:
+        elif isinstance(date, str):
             start, end = parse_singledate(date) # -> start, end
         else:
-            from astropy import time 
             start, end = time.Time(date).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
@@ -500,7 +518,6 @@ class MetaDataHandler( object ):
         elif type(date) is str:
             start, end = parse_singledate(date) # -> start, end
         else:
-            from astropy import time 
             start, end = time.Time(date, format=format).datetime
 
         months = cls._daterange_to_monthlist_(start, end)
@@ -573,7 +590,6 @@ class RawMetaData( MetaDataHandler ):
             raise NotImplementedError("you must define cls._SUBKIND")
         
         year, month = int(year), int(month)
-        from astropy import time
         from ztfquery import query
         fileout = cls.get_monthly_metadatafile(year, month)
         
@@ -629,12 +645,12 @@ class RawFlatMetaData( RawMetaData ):
         dataframe (IRSA metadata)
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
-        if not 'ledid' in data.columns : 
+        if 'ledid' not in data.columns:
             data = cls._add_ledinfo_to_datafile(data, **kwargs)
-        
+
         if ledid is not None:
             data = data[data["ledid"].isin(np.atleast_1d(ledid))]
-            
+
         return data
     
     # ================= #
@@ -645,7 +661,6 @@ class RawFlatMetaData( RawMetaData ):
         """ """
         year, month = int(year), int(month)
         from ztfquery import io
-        from astropy.io import fits
         def getval_from_header(filename, value, ext=None, **kwargs):
             """ """
             return fits.getval(io.get_file(filename, **kwargs),  value, ext=ext)
@@ -676,21 +691,25 @@ class RawFlatMetaData( RawMetaData ):
     
     @staticmethod
     def _add_ledinfo_to_datafile(data, use_dask=True): 
-        from astropy.io import fits
-        
-        getfunc = fits.getval
-        
+
+        def _get_ledid(fname):
+            try:
+                return fits.getval(fname, 'ILUM_LED')
+            except FileNotFoundError as exc:
+                warnings.warn(f"could not get ledid: {exc}", UserWarning)
+                return -1
+
         if use_dask :
             import dask
-            getfunc = dask.delayed(fits.getval)
-        
-        file_to_led = data.filepath.map(lambda x : getfunc(x, 'ILUM_LED'))
-        
+            _get_ledid = dask.delayed(_get_ledid)
+
+        file_to_led = data.filepath.map(_get_ledid)
+
         if use_dask : 
             data['ledid'] = dask.compute(*file_to_led)
         else : 
             data['ledid'] = file_to_led
-        
+
         return data
              
 class RawBiasMetaData( RawMetaData ):

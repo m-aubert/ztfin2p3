@@ -64,6 +64,7 @@ class CalibPipe:
         self,
         corr_overscan: bool = True,
         corr_nl: bool = True,
+        load_if_exists: bool = False,
         reprocess: bool = False,
         save: bool = True,
         **kwargs,
@@ -77,6 +78,8 @@ class CalibPipe:
             true, nl is applied first)
         corr_nl : bool
             Correct for non-linearity?
+        load_if_exists : bool
+            Load existing files in memory?
         reprocess : bool
             Reprocess existing files?
         save : bool
@@ -101,10 +104,14 @@ class CalibPipe:
                     hdr = self.build_header(row)
                     ensure_path_exists(filename)
                     fits.writeto(filename, data, header=hdr, overwrite=True)
-            else:
+            elif load_if_exists:
                 self.logger.info("loading file %s", filename)
                 data = CCD.from_filename(filename).get_data()
-            self.df.at[i, "ccd"] = data
+            else:
+                data = None
+
+            if data is not None:
+                self.df.at[i, "ccd"] = data
 
     def store_ccds(self, overwrite: bool = True, **kwargs):
         """Store created ccds.
@@ -132,7 +139,9 @@ class CalibPipe:
             raise ValueError("selection is not unique")
 
         row = self.df.loc[idx[0]]
-        if row.ccd is None:
+        if row.ccd is None or (
+            isinstance(row.ccd, list) and all(x is None for x in row.ccd)
+        ):
             self.logger.info("loading file %s", row.fileout)
             self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout).get_data()
         return self.df.loc[idx[0]].ccd
@@ -198,6 +207,7 @@ class FlatPipe(CalibPipe):
         corr_nl: bool = True,
         corr_overscan: bool = True,
         corr_pocket: bool = True,
+        load_if_exists: bool = False,
         normalize: bool = True,
         reprocess: bool = False,
         save: bool = True,
@@ -215,6 +225,8 @@ class FlatPipe(CalibPipe):
             true, nl is applied first)
         corr_nl : bool
             Correct for non-linearity?
+        load_if_exists : bool
+            Load existing files in memory?
         normalize: bool
             Normalize each flat by the nanmedian level?
         reprocess : bool
@@ -267,10 +279,14 @@ class FlatPipe(CalibPipe):
                     hdr = self.build_header(row, FLTNORM=norm)
                     ensure_path_exists(filename)
                     fits.writeto(filename, data, header=hdr, overwrite=True)
-            else:
+            elif load_if_exists:
                 self.logger.info("loading file %s", filename)
                 data = CCD.from_filename(filename).get_data()
-            self.df.at[i, "ccd"] = data
+            else:
+                data = None
+
+            if data is not None:
+                self.df.at[i, "ccd"] = data
 
     def build_header(self, row, **kwargs):
         ledid = row.ledid if isinstance(row.ledid, int) else None

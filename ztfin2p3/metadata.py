@@ -95,7 +95,8 @@ def get_metadata(time_range,
     """
     time_range = time.Time(time_range, format=format)
     start_, stop_ = ["-".join(l.split("-")[:2]) for l in time_range.iso]
-    list_files = ["-".join(str(l).split("-")[:2]) for l in pandas.date_range(start=start_+"-01", end=stop_+"-01", freq='m').values
+    list_files = ["-".join(str(l).split("-")[:2])
+                      for l in pandas.date_range(start=start_+"-01", end=stop_+"-01", freq='m').values
                  ] + [start_, stop_]
 
     

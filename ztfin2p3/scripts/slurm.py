@@ -48,7 +48,7 @@ def sbatch(
     return sbatch
 
 
-@click.command(context_settings={"show_default": True})
+@click.command(context_settings={"show_default": True, "ignore_unknown_options": True})
 @click.argument("day")
 @click.option(
     "--to", help="specify the end of the period to process, default to one day"
@@ -58,22 +58,18 @@ def sbatch(
     default="D",
     help="frequency for date range, D=daily, W=weekly, M=monthly, etc.",
 )
-@click.option("--steps", default="bias,flat,sci,aper", help="steps to run")
 @click.option("--statsdir", default=".", help="path where statistics are stored")
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--account", default="ztf", help="account to charge resources to")
-@click.option(
-    "--partition", default="htc", help="partition for the resource allocation"
-)
+@click.option("--partition", default="htc", help="partition for resource allocation")
 @click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
 @click.option("--mem", "-m", default="8GB", help="memory limit")
-@click.option("--force", help="force reprocessing all files?", is_flag=True)
+@click.argument("d2a_args", nargs=-1, type=click.UNPROCESSED)
 def run_d2a(
     day,
     to,
     freq,
-    steps,
     statsdir,
     envpath,
     account,
@@ -81,7 +77,7 @@ def run_d2a(
     cpu_time,
     mem,
     dry_run,
-    force,
+    d2a_args,
 ):
     """Run d2a for a DAY or a period on a Slurm cluster."""
 
@@ -97,10 +93,10 @@ def run_d2a(
 
     for day in days:
         date = str(day.date())
-        cmd = f"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
-        cmd += f" --statsdir {statsdir} --steps {steps}"
-        if force:
-            cmd += " --force"
+        cmd = rf"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
+        cmd += f" --statsdir {statsdir}"
+        cmd += " ".join(d2a_args)
+
         sbatch_cmd = sbatch(
             f"ztf_d2a_{date.replace('-', '')}",
             cmd,
@@ -111,6 +107,7 @@ def run_d2a(
             partition=partition,
             output=os.path.join(statsdir, "slurm-%A-%a.log"),
         )
+
         if dry_run:
             print(sbatch_cmd)
         else:

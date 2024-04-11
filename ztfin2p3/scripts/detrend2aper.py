@@ -34,7 +34,6 @@ BIAS_PARAMS = dict(
 FLAT_PARAMS = dict(
     corr_nl=True,
     corr_overscan=True,
-    corr_pocket=True,
     axis=0,
     sigma_clip=3,
     mergedhow="nanmean",
@@ -46,7 +45,6 @@ FLAT_PARAMS = dict(
 SCI_PARAMS = dict(
     corr_nl=True,
     corr_overscan=True,
-    corr_pocket=True,
     overwrite=True,
     fp_flatfield=False,
     return_sci_quads=True,
@@ -71,10 +69,15 @@ def _run_pdb(type, value, tb) -> None:  # pragma: no cover
     pdb.pm()
 
 
-def process_sci(raw_file, flat, bias, suffix, radius, do_aper=True):
+def process_sci(raw_file, flat, bias, suffix, radius, pocket, do_aper=True):
     logger = logging.getLogger(__name__)
     quads, outs = build_science_image(
-        raw_file, flat, bias, newfile_dict=dict(new_suffix=suffix), **SCI_PARAMS
+        raw_file,
+        flat,
+        bias,
+        newfile_dict=dict(new_suffix=suffix),
+        corr_pocket=pocket,
+        **SCI_PARAMS,
     )
 
     aper_stats = {}
@@ -116,10 +119,23 @@ def process_sci(raw_file, flat, bias, suffix, radius, do_aper=True):
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
 @click.option("--radius-max", type=int, default=12, help="maximum aperture radius")
 @click.option("--suffix", help="suffix for output science files")
+@click.option("--pocket", is_flag=True, help="apply pocket correction?")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
 @click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
-def d2a(day, ccdid, steps, statsdir, radius_min, radius_max, suffix, force, debug, pdb):
+def d2a(
+    day,
+    ccdid,
+    steps,
+    statsdir,
+    radius_min,
+    radius_max,
+    suffix,
+    pocket,
+    force,
+    debug,
+    pdb,
+):
     """Detrending to Aperture pipeline for a given day.
 
     \b
@@ -173,8 +189,8 @@ def d2a(day, ccdid, steps, statsdir, radius_min, radius_max, suffix, force, debu
     # Generate master flats:
     if "flat" in steps:
         t0 = time.time()
-        fi = FlatPipe(day, ccdid=ccdid)
-        fi.build_ccds(bias=bi, reprocess=force, **FLAT_PARAMS)
+        fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+        fi.build_ccds(bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS)
         timing = time.time() - t0
         logger.info("flat done, %.2f sec.", timing)
         stats["flat"] = {"time": timing}
@@ -213,7 +229,7 @@ def d2a(day, ccdid, steps, statsdir, radius_min, radius_max, suffix, force, debu
                 t0 = time.time()
                 try:
                     aper_stats = process_sci(
-                        raw_file, flat, bias, suffix, radius, do_aper=do_aper
+                        raw_file, flat, bias, suffix, radius, pocket, do_aper=do_aper
                     )
                 except Exception as exc:
                     if pdb:

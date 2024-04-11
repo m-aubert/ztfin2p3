@@ -184,6 +184,7 @@ class FlatPipe(CalibPipe):
         period: str | tuple[str, str],
         keep_rawmeta: bool = False,
         nskip: int | None = None,
+        suffix: str | None = None,
         use_dask: bool = False,
         **kwargs,
     ):
@@ -200,6 +201,8 @@ class FlatPipe(CalibPipe):
             ),
             axis=1,
         )
+        if suffix is not None:
+            self.df.fileout = self.df.fileout.str.replace(".fits", f"_{suffix}.fits")
 
     def build_ccds(
         self,

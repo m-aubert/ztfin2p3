@@ -151,7 +151,7 @@ class CalibPipe:
         # flatten file list if needed
         flist = row.filepath
         nframes = len(
-            list(itertools.chain(*flist)) if isinstance(flist, list) else flist
+            list(itertools.chain(*flist)) if isinstance(flist[0], list) else flist
         )
         meta = {
             "IMGTYPE": self.kind,

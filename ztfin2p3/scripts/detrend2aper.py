@@ -11,8 +11,9 @@ import rich_click as click
 from astropy.io import fits
 from rich.logging import RichHandler
 from ztfquery.buildurl import filename_to_url
+from ztfimg import __version__ as ztfimg_version
 
-from ztfin2p3 import __version__
+from ztfin2p3 import __version__ as ztfin2p3_version
 from ztfin2p3.aperture import get_aperture_photometry
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
@@ -115,7 +116,7 @@ def process_sci(raw_file, flat, bias, suffix, radius, pocket, do_aper=True):
     help="ccdid in the range 1 to 16",
 )
 @click.option("--steps", default="bias,flat,sci,aper", help="steps to run")
-@click.option("--statsdir", default=".", help="path where statistics are stored")
+@click.option("--statsdir", help="path where statistics are stored")
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
 @click.option("--radius-max", type=int, default=12, help="maximum aperture radius")
 @click.option("--suffix", help="suffix for output science files")
@@ -168,10 +169,15 @@ def d2a(
 
     day = day.replace("-", "")
     radius = np.arange(radius_min, radius_max)
-    statsdir = pathlib.Path(statsdir)
     steps = steps.split(",")
     now = datetime.datetime.now(datetime.UTC)
-    stats = {"date": now.isoformat(), "day": day, "ccd": ccdid, "version": __version__}
+    stats = {
+        "date": now.isoformat(),
+        "day": day,
+        "ccd": ccdid,
+        "ztfimg_version": ztfimg_version,
+        "ztfin2p3_version": ztfin2p3_version,
+    }
     tot = time.time()
 
     logger = logging.getLogger(__name__)
@@ -262,9 +268,11 @@ def d2a(
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
 
-    stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
-    logger.info("writing stats to %s", stats_file)
-    stats_file.write_text(json.dumps(stats))
+    if statsdir is not None:
+        statsdir = pathlib.Path(statsdir)
+        stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
+        logger.info("writing stats to %s", stats_file)
+        stats_file.write_text(json.dumps(stats))
 
     if n_errors > 0:
         logger.warning("%d sci files failed", n_errors)

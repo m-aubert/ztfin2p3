@@ -94,7 +94,7 @@ def run_d2a(
     for day in days:
         date = str(day.date())
         cmd = rf"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
-        cmd += f" --statsdir {statsdir}"
+        cmd += f" --statsdir {statsdir} "
         cmd += " ".join(d2a_args)
 
         sbatch_cmd = sbatch(

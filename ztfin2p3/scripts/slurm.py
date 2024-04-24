@@ -17,7 +17,7 @@ def sbatch(
     gpu=False,
     gpu_model=None,
     gpu_number=1,
-    output=None,
+    output="slurm-%j.log",
     email=None,
     debug=False,
 ):
@@ -49,65 +49,56 @@ def sbatch(
 
 
 @click.command(context_settings={"show_default": True, "ignore_unknown_options": True})
-@click.argument("day")
-@click.option(
-    "--to", help="specify the end of the period to process, default to one day"
-)
+@click.argument("cmd")
+@click.argument("date")
+@click.option("--to", help="specify the end of the period to process")
 @click.option(
     "--freq",
     default="D",
     help="frequency for date range, D=daily, W=weekly, M=monthly, etc.",
 )
-@click.option("--statsdir", default=".", help="path where statistics are stored")
+@click.option("--logdir", default=".", help="path where logs are stored")
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--partition", default="htc", help="partition for resource allocation")
 @click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
 @click.option("--mem", "-m", default="8GB", help="memory limit")
-@click.argument("d2a_args", nargs=-1, type=click.UNPROCESSED)
-def run_d2a(
-    day,
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def run(
+    cmd,
+    date,
     to,
     freq,
-    statsdir,
+    logdir,
     envpath,
     account,
     partition,
     cpu_time,
     mem,
     dry_run,
-    d2a_args,
+    args,
 ):
     """Run d2a for a DAY or a period on a Slurm cluster."""
-
-    if to is not None:
-        days = pd.date_range(day, to, freq=freq)
-    else:
-        days = pd.date_range(day, day)
 
     if envpath:
         ztfcmd = f"{envpath}/bin/ztfin2p3"
     else:
         ztfcmd = "ztfin2p3"
 
-    for day in days:
-        date = str(day.date())
-        cmd = rf"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
-        cmd += f" --statsdir {statsdir} "
-        cmd += " ".join(d2a_args)
-
+    def srun(cmdstr, array=None, **kwargs):
+        logfile = "slurm-%A-%a.log" if array else "slurm-%j.log"
         sbatch_cmd = sbatch(
-            f"ztf_d2a_{date.replace('-', '')}",
-            cmd,
-            array="1-16",
+            f"ztf_{cmd}_{date.replace('-', '')}",
+            cmdstr,
+            array=array,
             cpu_time=cpu_time,
             mem=mem,
             account=account,
             partition=partition,
-            output=os.path.join(statsdir, "slurm-%A-%a.log"),
+            output=os.path.join(logdir, logfile),
+            **kwargs,
         )
-
         if dry_run:
             print(sbatch_cmd)
         else:
@@ -115,3 +106,22 @@ def run_d2a(
                 sbatch_cmd, shell=True, stderr=subprocess.STDOUT
             )
             print(out.decode().splitlines()[-1])
+
+    if cmd == "parse-cal":
+        cmdstr = f"{ztfcmd} {cmd} {date}" + " ".join(args)
+        srun(cmdstr)
+
+    elif cmd == "d2a":
+        if to is not None:
+            days = pd.date_range(date, to, freq=freq)
+        else:
+            days = pd.date_range(date, date)
+
+        for day in days:
+            date = str(day.date())
+            cmdstr = rf"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
+            cmdstr += f" --statsdir {logdir} "
+            cmdstr += " ".join(args)
+            srun(cmdstr, array="1-16")
+    else:
+        raise ValueError("unknown command")

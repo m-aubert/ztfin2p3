@@ -183,10 +183,19 @@ def d2a(
     logger = logging.getLogger(__name__)
     logger.info("processing day %s, ccd=%s", day, ccdid)
 
+    bi = BiasPipe(day, ccdid=ccdid, nskip=10)
+    if len(bi.df) == 0:
+        logger.warning(f"no bias for {day}")
+        sys.exit(1)
+
+    fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+    if len(fi.df) == 0:
+        logger.warning(f"no flat for {day}")
+        sys.exit(1)
+
     # Generate master bias:
     if "bias" in steps:
         t0 = time.time()
-        bi = BiasPipe(day, ccdid=ccdid, nskip=10)
         bi.build_ccds(reprocess=force, **BIAS_PARAMS)
         timing = time.time() - t0
         logger.info("bias done, %.2f sec.", timing)
@@ -195,7 +204,6 @@ def d2a(
     # Generate master flats:
     if "flat" in steps:
         t0 = time.time()
-        fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
         fi.build_ccds(bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS)
         timing = time.time() - t0
         logger.info("flat done, %.2f sec.", timing)

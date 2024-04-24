@@ -472,7 +472,10 @@ class MetaDataHandler( object ):
         data["year"] = data["filefracday"].astype("str").str[:4]
 
         if add_filepath:
-            data["filepath"] = metadata_to_url(data)
+            if len(data) == 0:
+                data["filepath"] = None
+            else:
+                data["filepath"] = metadata_to_url(data)
             
         return data
     

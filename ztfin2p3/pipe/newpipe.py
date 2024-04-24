@@ -45,9 +45,14 @@ class CalibPipe:
             self.rawmeta = rawmeta
 
         self.df = rawmeta.groupby(self.group_keys)["filepath"].apply(list).reset_index()
-        self.df["fileout"] = self.df.apply(
-            lambda row: io.get_daily_biasfile(row.day, row.ccdid), axis=1
-        )
+
+        if len(self.df) == 0:
+            self.logger.warning("no metadata for %s", period)
+            self.df["fileout"] = None
+        else:
+            self.df["fileout"] = self.df.apply(
+                lambda row: io.get_daily_biasfile(row.day, row.ccdid), axis=1
+            )
         self.df["ccd"] = None
 
         if nskip is not None:
@@ -193,6 +198,10 @@ class FlatPipe(CalibPipe):
         )
         # Add filterid (grouping by LED)
         self.df["filterid"] = self.df.ledid.map(lambda x: FILTER2LED[x])
+
+        if len(self.df) == 0:
+            return
+
         _groupbyk = ["day", "ccdid", "filterid"]
         self.df = self.df.groupby(_groupbyk).aggregate(list).reset_index()
         self.df.fileout = self.df.apply(

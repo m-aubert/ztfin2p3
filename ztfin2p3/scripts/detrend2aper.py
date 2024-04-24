@@ -188,11 +188,6 @@ def d2a(
         logger.warning(f"no bias for {day}")
         sys.exit(1)
 
-    fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
-    if len(fi.df) == 0:
-        logger.warning(f"no flat for {day}")
-        sys.exit(1)
-
     # Generate master bias:
     if "bias" in steps:
         t0 = time.time()
@@ -200,6 +195,11 @@ def d2a(
         timing = time.time() - t0
         logger.info("bias done, %.2f sec.", timing)
         stats["bias"] = {"time": timing}
+
+    fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+    if len(fi.df) == 0:
+        logger.warning(f"no flat for {day}")
+        sys.exit(1)
 
     # Generate master flats:
     if "flat" in steps:

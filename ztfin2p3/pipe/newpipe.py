@@ -10,8 +10,8 @@ from ztfimg import CCD, __version__ as ztfimg_version
 from .. import io, metadata, __version__
 from ..builder import calib_from_filenames, calib_from_filenames_withcorr
 
-LED2FILTER = {"zg": [2, 3, 4, 5], "zr": [7, 8, 9, 10], "zi": [11, 12, 13]}
-FILTER2LED = {led: filt for filt, leds in LED2FILTER.items() for led in leds}
+FILTER2LED = {"zg": [2, 3, 4, 5], "zr": [7, 8, 9, 10], "zi": [11, 12, 13]}
+LED2FILTER = {led: filt for filt, leds in FILTER2LED.items() for led in leds}
 
 
 def ensure_path_exists(filename):
@@ -197,13 +197,18 @@ class FlatPipe(CalibPipe):
             period, keep_rawmeta=keep_rawmeta, nskip=nskip, use_dask=use_dask, **kwargs
         )
         # Add filterid (grouping by LED)
-        self.df["filterid"] = self.df.ledid.map(lambda x: FILTER2LED[x])
+        self.df["filterid"] = self.df.ledid.map(lambda x: LED2FILTER.get(x, ""))
+
+        if self.df.filterid.eq("").any():
+            self.logger.warning("removing some flats without ledid")
+            self.df = self.df[self.df.filterid.ne("")]
 
         if len(self.df) == 0:
             return
 
         _groupbyk = ["day", "ccdid", "filterid"]
         self.df = self.df.groupby(_groupbyk).aggregate(list).reset_index()
+        self.df["nled"] = self.df.ledid.map(len)
         self.df.fileout = self.df.apply(
             lambda row: io.get_daily_flatfile(
                 row.day, row.ccdid, filtername=row.filterid
@@ -212,6 +217,10 @@ class FlatPipe(CalibPipe):
         )
         if suffix is not None:
             self.df.fileout = self.df.fileout.str.replace(".fits", f"_{suffix}.fits")
+
+        if not np.all(self.df.nled == [4, 3, 4]):
+            self.logger.warning("non-standard number of flats per led:")
+            self.logger.warning(str(dict(zip(self.df.filterid, self.df.nled))))
 
     def build_ccds(
         self,

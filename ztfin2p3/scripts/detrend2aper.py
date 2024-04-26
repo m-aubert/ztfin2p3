@@ -22,9 +22,6 @@ from ztfin2p3.science import build_science_image
 
 
 BIAS_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    axis=0,
     sigma_clip=3,
     mergedhow="nanmean",
     clipping_prop=dict(
@@ -33,9 +30,6 @@ BIAS_PARAMS = dict(
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 FLAT_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    axis=0,
     sigma_clip=3,
     mergedhow="nanmean",
     clipping_prop=dict(
@@ -44,12 +38,8 @@ FLAT_PARAMS = dict(
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 SCI_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    overwrite=True,
-    fp_flatfield=False,
-    return_sci_quads=True,
     overscan_prop=dict(userange=[25, 30]),
+    return_sci_quads=True,
 )
 APER_PARAMS = dict(
     cat="gaia_dr2",

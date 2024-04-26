@@ -111,7 +111,7 @@ class CalibPipe:
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             elif load_if_exists:
                 self.logger.info("loading file %s", filename)
-                data = CCD.from_filename(filename).get_data()
+                data = CCD.from_filename(filename)
             else:
                 data = None
 
@@ -148,7 +148,7 @@ class CalibPipe:
             isinstance(row.ccd, list) and all(x is None for x in row.ccd)
         ):
             self.logger.info("loading file %s", row.fileout)
-            self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout).get_data()
+            self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout)
         return self.df.loc[idx[0]].ccd
 
     def build_header(self, row, **kwargs):
@@ -302,7 +302,7 @@ class FlatPipe(CalibPipe):
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             elif load_if_exists:
                 self.logger.info("loading file %s", filename)
-                data = CCD.from_filename(filename).get_data()
+                data = CCD.from_filename(filename)
             else:
                 data = None
 

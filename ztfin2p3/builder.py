@@ -7,7 +7,7 @@ import dask.array as da
 import numpy as np
 from astropy.io import fits
 
-from ztfimg import collection
+from ztfimg import collection, CCD
 
 __all__ = ["CalibrationBuilder"]
 
@@ -351,13 +351,13 @@ class CalibrationBuilder:  # /day /week /month
         corr_nl=True,
         corr_overscan=True,
         corr_pocket=False,
+        corr=None,
         set_it=False,
         incl_header=False,
         header_keys=None,
         chunkreduction=2,
         dask_on_header=False,
         get_data_props={},
-        corr=None,
         **kwargs,
     ):
         """build the mean data.
@@ -374,6 +374,10 @@ class CalibrationBuilder:  # /day /week /month
 
         corr_pocket: bool
             Should data be corrected for the pocket effect
+
+        corr: bool
+            Correction applied to flats before combination (e.g.
+            bias subtraction)
 
         chunkreduction: int
             rechunk and split of the image.
@@ -417,6 +421,8 @@ class CalibrationBuilder:  # /day /week /month
         )
 
         if corr is not None:
+            if isinstance(corr, CCD):
+                corr = corr.get_data()
             data = data - corr
 
         data = get_meandata(data, chunkreduction=chunkreduction, **kwargs)

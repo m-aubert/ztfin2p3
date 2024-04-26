@@ -67,14 +67,24 @@ def build_science_exposure(rawfiles, flats, biases, dask_level="deep", **kwargs)
 
     return outs
 
-def build_science_image(rawfile, flat, bias,
-                            flat_coef=None,
-                            dask_level=None,
-                            corr_nl=True,
-                            corr_overscan=True,
-                            overwrite=True, fp_flatfield=False, newfile_dict = {}, return_sci_quads = False ,
-                            **kwargs):
-    """ Top level method to build a single processed image.
+
+def build_science_image(
+    rawfile,
+    flat=None,
+    bias=None,
+    corr_nl=True,
+    corr_overscan=True,
+    corr_pocket=False,
+    dask_level=None,
+    flat_coef=None,
+    fp_flatfield=False,
+    max_timedelta="1w",
+    newfile_dict={},
+    overwrite=True,
+    return_sci_quads=False,
+    **kwargs,
+):
+    """Top level method to build a single processed image.
 
     It calls:
     - to get the data: build_science_data()
@@ -86,11 +96,13 @@ def build_science_image(rawfile, flat, bias,
     rawfile: str
         filename or filepath of a raw image.
 
-    flat, bias: str, ztfimg.CCD, array
+    flat, bias: str, ztfimg.CCD, array, optional
         ccd data to calibrate the rawimage
         str: filepath
         ccd: ccd object containing the data
         array: numpy or dask array
+        If not specified, try using the master bias/flat metadata files to
+        find the closest master bias/flat that is already processed.
 
     dask_level: None, "shallow", "medium", "deep"
         should this use dask and how ?
@@ -112,18 +124,26 @@ def build_science_image(rawfile, flat, bias,
     corr_nl: bool
         Should data be corrected for non-linearity
 
-    overwrite: bool
-        should this overwirte existing files ?
-
     fp_flatfield : bool
         If True, applies a focal plane normalization to the flat.
-        Beware, if files are not available, it does not raise and error and use files on disk.
+        Beware, if files are not available, it does not raise and error and use
+        files on disk.
+
+    max_timedelta : str
+        When finding master bias/flat from already processed ones, specifies
+        the maximum time delta to consider the file as valid. Use pandas
+        formats, e.g. "1d", "1w" etc.
 
     newfile_dict : dict
-        Kwargs for the ipacfilemant_to_ztfin2p3filepath to change easily filename and extensions.
+        Kwargs for the ipacfilemant_to_ztfin2p3filepath to change easily
+        filename and extensions.
 
     return_sci_quads : bool
-        If True, returns a list of ztfimg.ScienceQuadrants and filepaths. Otherwise, returns only filepaths
+        If True, returns a list of ztfimg.ScienceQuadrants and filepaths.
+        Otherwise, returns only filepaths
+
+    overwrite: bool
+        should this overwirte existing files ?
 
     **kwargs :
         Arguments passed to the ztfimg.RawCCD.get_data of the raw object image.
@@ -132,73 +152,6 @@ def build_science_image(rawfile, flat, bias,
     -------
     list
         results of fits.writeto (or delayed of that, see use_dask)
-    """
-    # new of ipac sciimg.
-    ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
-    new_filenames = [ipacfilename_to_ztfin2p3filepath(f, **newfile_dict) for f in ipac_filepaths]
-
-    # Patch
-    # Here avoid to do all the computation to not do the work in the end.
-    # Especially if all quadrants files are created.
-    if not overwrite :
-        outs = new_filenames
-        do =  sum([os.path.isfile(newfile) for newfile in new_filenames])
-        if do == 4 :
-            if dask_level == 'shallow':
-                outs = dask.delayed(outs)  #Weird thing to keep consistent
-
-            return outs
-
-    if dask_level == "shallow": # dasking at the top level method
-        new_data = dask.delayed(build_science_data)(rawfile, flat, bias,
-                                                    flat_coef=flat_coef,
-                                                        dask_level=None,
-                                                        corr_nl=corr_nl,
-                                                        corr_overscan=corr_overscan, fp_flatfield=fp_flatfield,
-                                                        **kwargs)
-
-        new_header = dask.delayed(build_science_headers)(rawfile,
-                                                         ipac_filepaths=ipac_filepaths,
-                                                            use_dask=False)
-
-        # note that filenames are not delayed even if dasked.
-        outs = dask.delayed(store_science_image)(new_data, new_header, new_filenames,
-                                                    use_dask=False)
-    else:
-        use_dask = dask_level is not None
-        new_data = build_science_data(rawfile, flat, bias,
-                                      flat_coef=flat_coef,
-                                          dask_level=dask_level,
-                                          corr_nl=corr_nl,
-                                          corr_overscan=corr_overscan,fp_flatfield=fp_flatfield,  **kwargs)
-
-        new_header = build_science_headers(rawfile,
-                                            ipac_filepaths=ipac_filepaths,
-                                            use_dask=use_dask)
-
-        # note that filenames are not delayed even if dasked.
-        outs = store_science_image(new_data, new_header, new_filenames,
-                                   use_dask=use_dask)
-
-    if return_sci_quads :
-        return [ztfimg.ScienceQuadrant.from_data(data=data, header=header) for data,header in zip(new_data, new_header)], outs
-    else :
-        return outs
-
-
-def build_science_(
-    rawfile,
-    corr_nl=True,
-    corr_overscan=True,
-    corr_pocket=False,
-    max_timedelta="1w",
-    newfile_dict={},
-    overwrite=True,
-    return_sci_quads=False,
-    **kwargs,
-):
-    """
-    Build sciimg given raw data, fetching master bias/flat, mask and header.
     """
 
     info = parse_filename(rawfile)
@@ -210,33 +163,77 @@ def build_science_(
     year, month, day = info["year"], info["month"], info["day"]
     date = pd.to_datetime(f"{year}{month}{day}")
 
-    biasfile = find_closest_calib_file(
-        year, date, ccdid, kind="bias", max_timedelta=max_timedelta
-    )
-    bias = ztfimg.CCD.from_filename(biasfile).get_data()
+    if bias is None:
+        biasfile = find_closest_calib_file(
+            year, date, ccdid, kind="bias", max_timedelta=max_timedelta
+        )
+        bias = ztfimg.CCD.from_filename(biasfile).get_data()
 
-    flatfile = find_closest_calib_file(
-        year,
-        date,
-        ccdid,
-        filtername=filtername,
-        kind="flat",
-        max_timedelta=max_timedelta,
-    )
-    flat = ztfimg.CCD.from_filename(flatfile).get_data()
+    if flat is None:
+        flatfile = find_closest_calib_file(
+            year,
+            date,
+            ccdid,
+            filtername=filtername,
+            kind="flat",
+            max_timedelta=max_timedelta,
+        )
+        flat = ztfimg.CCD.from_filename(flatfile).get_data()
 
-    return build_science_image(
+    # new of ipac sciimg.
+    ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
+    new_filenames = [
+        ipacfilename_to_ztfin2p3filepath(f, **newfile_dict) for f in ipac_filepaths
+    ]
+
+    # Here avoid to do all the computation to not do the work in the end.
+    # Especially if all quadrants files are created.
+    if not overwrite:
+        outs = new_filenames
+        do = sum(os.path.isfile(newfile) for newfile in new_filenames)
+        if do == 4:
+            if dask_level == "shallow":
+                outs = dask.delayed(outs)  # Weird thing to keep consistent
+            return outs
+
+    if dask_level == "shallow":  # dasking at the top level method
+        dask_level = None
+        use_dask = False
+        maybe_delayed = dask.delayed
+    else:
+        use_dask = dask_level is not None
+        maybe_delayed = lambda x: x  # noqa
+
+    new_data = maybe_delayed(build_science_data)(
         rawfile,
         flat,
         bias,
+        flat_coef=flat_coef,
+        dask_level=dask_level,
         corr_nl=corr_nl,
         corr_overscan=corr_overscan,
         corr_pocket=corr_pocket,
-        newfile_dict=newfile_dict,
-        overwrite=overwrite,
-        return_sci_quads=return_sci_quads,
+        fp_flatfield=fp_flatfield,
         **kwargs,
     )
+
+    new_header = maybe_delayed(build_science_headers)(
+        rawfile, ipac_filepaths=ipac_filepaths, use_dask=use_dask
+    )
+
+    # note that filenames are not delayed even if dasked.
+    outs = maybe_delayed(store_science_image)(
+        new_data, new_header, new_filenames, use_dask=use_dask
+    )
+
+    if return_sci_quads:
+        quads = [
+            ztfimg.ScienceQuadrant.from_data(data=data, header=header)
+            for data, header in zip(new_data, new_header)
+        ]
+        return quads, outs
+    else:
+        return outs
 
 
 # ------------- #

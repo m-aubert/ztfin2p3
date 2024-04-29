@@ -8,10 +8,9 @@ from datetime import datetime
 import dask
 import numpy as np
 import pandas as pd
-from astropy.io import fits
-
 import ztfimg
-from ztfquery.buildurl import get_scifile_of_filename, parse_filename
+from astropy.io import fits
+from ztfquery.buildurl import filename_to_url, get_scifile_of_filename, parse_filename
 
 from . import __version__
 from .io import (
@@ -79,8 +78,10 @@ def build_science_image(
     fp_flatfield=False,
     max_timedelta="1w",
     newfile_dict={},
-    overwrite=True,
     return_sci_quads=False,
+    store=True,
+    overwrite=True,
+    with_mask=False,
     **kwargs,
 ):
     """Top level method to build a single processed image.
@@ -141,8 +142,15 @@ def build_science_image(
         If True, returns a list of ztfimg.ScienceQuadrants and filepaths.
         Otherwise, returns only filepaths
 
-    overwrite: bool
-        should this overwirte existing files ?
+    store : bool
+        should this store produced files ?
+
+    overwrite : bool
+        should this overwrite existing files ? If False and files exists,
+        those will be returned without any processing.
+
+    with_mask : bool
+        read mask file and add it to the ScienceQuadrant object ?
 
     **kwargs :
         Arguments passed to the ztfimg.RawCCD.get_data of the raw object image.
@@ -224,19 +232,29 @@ def build_science_image(
         FLATFILE=flatfile,
     )
 
-    # note that filenames are not delayed even if dasked.
-    outs = maybe_delayed(store_science_image)(
-        new_data, new_header, new_filenames, use_dask=use_dask
-    )
+    if store:
+        # note that filenames are not delayed even if dasked.
+        maybe_delayed(store_science_image)(
+            new_data, new_header, new_filenames, use_dask=use_dask
+        )
 
     if return_sci_quads:
-        quads = [
-            ztfimg.ScienceQuadrant.from_data(data=data, header=header)
-            for data, header in zip(new_data, new_header)
-        ]
-        return quads, outs
+        quads = []
+        for data, header, fname in zip(new_data, new_header, new_filenames):
+            quad = ztfimg.ScienceQuadrant(data=data, header=header)
+            if with_mask:
+                fname_mask = filename_to_url(
+                    fname, suffix="mskimg.fits.gz", source="local"
+                )
+                quad.set_mask(fits.getdata(fname_mask))
+            quads.append(quad)
+        return quads
+    elif store:
+        return new_filenames
     else:
-        return outs
+        raise ValueError(
+            "at least one of store=True and return_sci_quads=True" "should be specified"
+        )
 
 
 # ------------- #
@@ -417,14 +435,11 @@ def store_science_image(
     list of str
     """
     maybe_delayed = dask.delayed if use_dask else identity
-    outs = []
     for data, header, filepath in zip(new_data, new_headers, new_filenames):
         if header is None and not noneheader:
             continue
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         maybe_delayed(fits.writeto)(filepath, data, header=header, overwrite=overwrite)
-        outs.append(filepath)
-    return outs
 
 
 # ------------- #

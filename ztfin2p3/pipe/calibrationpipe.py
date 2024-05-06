@@ -563,12 +563,10 @@ class FlatPipe( CalibPipe ):
             else :
                 import dask
                 
-            from ..builder import calib_from_filenames_withcorr
-            # function 
-            calib_from_filenames= calib_from_filenames_withcorr
+            from ..builder import calib_from_filenames
             
             if use_dask:
-                calib_from_filenames = dask.delayed(calib_from_filenames_withcorr)
+                calib_from_filenames = dask.delayed(calib_from_filenames)
                 
             #Overscan corr will be done in loop            
             prop = {**dict(corr_overscan=corr_overscan, corr_nl=corr_nl, 

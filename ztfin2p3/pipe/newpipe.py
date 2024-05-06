@@ -8,7 +8,7 @@ from astropy.io import fits
 from ztfimg import CCD, __version__ as ztfimg_version
 
 from .. import io, metadata, __version__
-from ..builder import calib_from_filenames, calib_from_filenames_withcorr
+from ..builder import calib_from_filenames
 
 FILTER2LED = {"zg": [2, 3, 4, 5], "zr": [7, 8, 9, 10], "zi": [11, 12, 13]}
 LED2FILTER = {led: filt for filt, leds in FILTER2LED.items() for led in leds}
@@ -111,7 +111,7 @@ class CalibPipe:
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             elif load_if_exists:
                 self.logger.info("loading file %s", filename)
-                data = CCD.from_filename(filename).get_data()
+                data = CCD.from_filename(filename)
             else:
                 data = None
 
@@ -148,7 +148,7 @@ class CalibPipe:
             isinstance(row.ccd, list) and all(x is None for x in row.ccd)
         ):
             self.logger.info("loading file %s", row.fileout)
-            self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout).get_data()
+            self.df.at[idx[0], "ccd"] = CCD.from_filename(row.fileout)
         return self.df.loc[idx[0]].ccd
 
     def build_header(self, row, **kwargs):
@@ -276,7 +276,7 @@ class FlatPipe(CalibPipe):
                 )
                 arrays, norms = [], []
                 for led_filelist in row["filepath"]:
-                    data = calib_from_filenames_withcorr(
+                    data = calib_from_filenames(
                         led_filelist,
                         corr=bias_data,
                         corr_nl=corr_nl,
@@ -302,7 +302,7 @@ class FlatPipe(CalibPipe):
                     fits.writeto(filename, data, header=hdr, overwrite=True)
             elif load_if_exists:
                 self.logger.info("loading file %s", filename)
-                data = CCD.from_filename(filename).get_data()
+                data = CCD.from_filename(filename)
             else:
                 data = None
 

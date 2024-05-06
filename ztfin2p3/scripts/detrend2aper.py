@@ -8,10 +8,9 @@ from typing import Any
 
 import numpy as np
 import rich_click as click
-from astropy.io import fits
 from rich.logging import RichHandler
-from ztfquery.buildurl import filename_to_url
 from ztfimg import __version__ as ztfimg_version
+from ztfquery.buildurl import get_scifile_of_filename
 
 from ztfin2p3 import __version__ as ztfin2p3_version
 from ztfin2p3.aperture import get_aperture_photometry
@@ -22,9 +21,6 @@ from ztfin2p3.science import build_science_image
 
 
 BIAS_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    axis=0,
     sigma_clip=3,
     mergedhow="nanmean",
     clipping_prop=dict(
@@ -33,9 +29,6 @@ BIAS_PARAMS = dict(
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 FLAT_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    axis=0,
     sigma_clip=3,
     mergedhow="nanmean",
     clipping_prop=dict(
@@ -44,12 +37,9 @@ FLAT_PARAMS = dict(
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 SCI_PARAMS = dict(
-    corr_nl=True,
-    corr_overscan=True,
-    overwrite=True,
-    fp_flatfield=False,
-    return_sci_quads=True,
     overscan_prop=dict(userange=[25, 30]),
+    return_sci_quads=True,
+    with_mask=True,
 )
 APER_PARAMS = dict(
     cat="gaia_dr2",
@@ -70,10 +60,10 @@ def _run_pdb(type, value, tb) -> None:  # pragma: no cover
     pdb.pm()
 
 
-def process_sci(raw_file, flat, bias, suffix, radius, pocket, do_aper=True):
+def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
     logger = logging.getLogger(__name__)
-    quads, outs = build_science_image(
-        raw_file,
+    quads = build_science_image(
+        rawfile,
         flat,
         bias,
         newfile_dict=dict(new_suffix=suffix),
@@ -85,12 +75,12 @@ def process_sci(raw_file, flat, bias, suffix, radius, pocket, do_aper=True):
     if not do_aper:
         return aper_stats
 
-    for quad, out in zip(quads, outs):
+    ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
+
+    for quad, out in zip(quads, ipac_filepaths):
         # Not using build_aperture_photometry cause it expects
         # filepath and not images. Will change.
         logger.info("aperture photometry for quadrant %d", quad.qid)
-        fname_mask = filename_to_url(out, suffix="mskimg.fits.gz", source="local")
-        quad.set_mask(fits.getdata(fname_mask))
         apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
         output_filename = ipacfilename_to_ztfin2p3filepath(
             out, new_suffix=suffix, new_extension="parquet"

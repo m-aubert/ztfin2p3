@@ -7,6 +7,8 @@ from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 from .io import ipacfilename_to_ztfin2p3filepath
 import warnings
+import pandas #pandas was not defined in get_aperture
+import dask #dask was not defined in get_aperture
 
 _MINIMAL_COLNAMES = {"gaia_dr2": ['id','ra', 'dec',
                                   'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
@@ -225,17 +227,23 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                         mask=mask,
                                         err=err,
                                         as_dataframe=True)
+    
+    radcols = [f'r_{k}' for k in range(len(radius))]
+
     if "dask" in str( type(sciimg) ):
         import dask.dataframe as dd
         colnames  = [f'f_{k}' for k in range(len(radius))]
         colnames += [f'f_{k}_e' for k in range(len(radius))]
         colnames += [f'f_{k}_f' for k in range(len(radius))]
+
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         ap_dataframe = dd.from_delayed(ap_dataframe, meta=meta)
+        ap_dataframe = ap_dataframe.assign(**{key : val for key, val in zip(radcols, radius)})
         
     if joined:
         cat_ = cat.reset_index()
         merged_cat = cat_.join(ap_dataframe)#.set_index("index")
+        merged_cat[radcols] = radius
         return merged_cat
 
     return ap_dataframe

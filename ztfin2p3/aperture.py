@@ -229,6 +229,7 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                         as_dataframe=True)
     
     radcols = [f'r_{k}' for k in range(len(radius))]
+    radius = radius.ravel() #Remove broadcasting
 
     if "dask" in str( type(sciimg) ):
         import dask.dataframe as dd

@@ -191,7 +191,7 @@ def _get_sciheader(month, expid=None, rcid=None, filters=None, **kwargs):
     header_df = metah = _get_sciheader('201904', expid=84831745, rcid=1)
     """
     # filepath
-    sciheader_file = os.path.join(LOCALSOURCE, "meta", "sci",
+    sciheader_file = os.path.join(LOCALSOURCE, "meta", "metaheader",
                                   f"metaheader_{month}.parquet")
     # filtering
     if filters is None:

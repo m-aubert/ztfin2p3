@@ -538,6 +538,10 @@ def find_closest_calib_file(
     df = df[df.CCDID.eq(ccdid)]
     if kind == "flat":
         df = df[df.FILTRKEY.eq(filtername)]
+
+    # drop duplicates if multiple files with different suffixes
+    # TODO: find way to identify those variant and filter on them ?
+    df.drop_duplicates('PERIOD', inplace=True)
     idx = df.index.get_indexer([date], method="nearest")
 
     td = abs(df.index[idx[0]] - date)

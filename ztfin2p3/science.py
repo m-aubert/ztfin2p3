@@ -70,6 +70,7 @@ def build_science_image(
     rawfile,
     flat=None,
     bias=None,
+    *,
     corr_nl=True,
     corr_overscan=True,
     corr_pocket=False,
@@ -80,6 +81,7 @@ def build_science_image(
     newfile_dict={},
     return_sci_quads=False,
     store=True,
+    outpath=None,
     overwrite=True,
     with_mask=False,
     **kwargs,
@@ -94,7 +96,7 @@ def build_science_image(
     Parameter
     ---------
     rawfile: str
-        filename or filepath of a raw image.
+        Filename or filepath of a raw image.
 
     flat, bias: str, ztfimg.CCD, array, optional
         ccd data to calibrate the rawimage
@@ -105,7 +107,7 @@ def build_science_image(
         find the closest master bias/flat that is already processed.
 
     dask_level: None, "shallow", "medium", "deep"
-        should this use dask and how ?
+        Should this use dask and how ?
         - None: dask not used.
         - shallow: delayed at the `get_science_data` (and co) level
         - medium: delayed at the `from_filename` level
@@ -135,7 +137,7 @@ def build_science_image(
         formats, e.g. "1d", "1w" etc.
 
     newfile_dict : dict
-        Kwargs for the ipacfilemant_to_ztfin2p3filepath to change easily
+        Kwargs for the ipacfilename_to_ztfin2p3filepath to change easily
         filename and extensions.
 
     return_sci_quads : bool
@@ -143,14 +145,16 @@ def build_science_image(
         Otherwise, returns only filepaths
 
     store : bool
-        should this store produced files ?
+        Should this store produced files ?
+
+    outpath : str
 
     overwrite : bool
-        should this overwrite existing files ? If False and files exists,
+        Should this overwrite existing files ? If False and files exists,
         those will be returned without any processing.
 
     with_mask : bool
-        read mask file and add it to the ScienceQuadrant object ?
+        Read mask file and add it to the ScienceQuadrant object ?
 
     **kwargs :
         Arguments passed to the ztfimg.RawCCD.get_data of the raw object image.
@@ -192,16 +196,18 @@ def build_science_image(
     new_filenames = [
         ipacfilename_to_ztfin2p3filepath(f, **newfile_dict) for f in ipac_filepaths
     ]
+    if outpath is not None:
+        new_filenames = [
+            os.path.join(outpath, os.path.basename(f)) for f in new_filenames
+        ]
 
     # Here avoid to do all the computation to not do the work in the end.
     # Especially if all quadrants files are created.
-    if not overwrite:
-        outs = new_filenames
-        do = sum(os.path.isfile(newfile) for newfile in new_filenames)
-        if do == 4:
-            if dask_level == "shallow":
-                outs = dask.delayed(outs)  # Weird thing to keep consistent
-            return outs
+    if not overwrite and all(os.path.isfile(newfile) for newfile in new_filenames):
+        if dask_level == "shallow":
+            # Weird thing to keep consistent
+            new_filenames = dask.delayed(new_filenames)
+        return new_filenames
 
     if dask_level == "shallow":  # dasking at the top level method
         dask_level = None
@@ -253,7 +259,7 @@ def build_science_image(
         return new_filenames
     else:
         raise ValueError(
-            "at least one of store=True and return_sci_quads=True" "should be specified"
+            "either store=True or return_sci_quads=True should be specified"
         )
 
 

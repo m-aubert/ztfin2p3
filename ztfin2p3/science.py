@@ -391,8 +391,14 @@ def build_science_data(
 def build_science_headers(rawfile, ipac_filepaths, use_dask=False, **kwargs):
     maybe_delayed = dask.delayed if use_dask else identity
     new_headers = []
+    rawhdr = fits.getheader(rawfile)
+    rawhdr.strip()
+
     for sciimg_ in ipac_filepaths:
-        header = maybe_delayed(exception_header)(sciimg_)
+        header = rawhdr.copy()
+        scihdr = maybe_delayed(exception_header)(sciimg_)
+        if scihdr is not None:
+            header.update(scihdr)
         header = maybe_delayed(header_from_quadrantheader)(header)
         for key, val in kwargs.items():
             header[key] = val
@@ -407,6 +413,7 @@ def exception_header(file_):
             hdr = fits.getheader(file_)
         except Exception as e:
             logging.getLogger(__name__).warn("%s", e)
+        hdr.strip()
     return hdr
 
 
@@ -463,6 +470,8 @@ def header_from_quadrantheader(
         "BIT",
         "HISTORY",
         "COMMENT",
+        "CHECKSUM",
+        "DATASUM",
     ),
 ):
     """build the new header for a ztf-ipac pipeline science quadrant header

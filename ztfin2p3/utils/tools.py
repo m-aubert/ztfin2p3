@@ -63,6 +63,8 @@ def parse_singledate(date):
 
 def header_from_files(files, keys, refheader_id=0, inputkey="INPUT"):
     """ """
+    from astropy.io import fits
+    
     header = fits.getheader(files[refheader_id])
     newheader = fits.Header()
     for k_ in keys:
@@ -121,3 +123,38 @@ def njy_to_mag(njy_, njyerr_=None):
         return mags
     dmags = +2.5/np.log(10) * njyerr_ / njy_
     return mags, dmags
+
+
+
+# ----------------------------- #
+#             Healpix           #
+# ----------------------------- #
+def get_healpix_intersect(ra, dec, radius, nside=64, **kwargs):
+    """ Module to get healpix overlap (ids)  
+
+    Parameters
+    ----------
+    ra, dec: [floatt]
+        central point coordinates in decimal degrees
+    
+    radius: [float]
+        radius of circle in degrees
+
+    nside: [int] -optional-
+        The healpix nside parameter, must be a power of 2, less than 2**30
+        
+    **kwags goes to HMpTy.HTM.intersect 
+         inclusive:
+             include IDs of triangles that intersect the circle as well as 
+             those completely inclosed by the circle. Default True
+
+    Returns
+    -------
+    list of healpix pixels overlapping with the input circle
+    """
+    import healpy as hp
+    # getting the position in the sky
+    vec=hp.ang2vec((90-dec)*np.pi/180,ra*np.pi/180)
+    # note that inclusive might return too many pixels, 
+    # but otherwise we would often miss some
+    return hp.query_disc(nside,vec,radius*np.pi/180,inclusive=True,nest=True,**kwargs)

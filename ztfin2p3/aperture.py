@@ -7,8 +7,13 @@ from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 from .io import ipacfilename_to_ztfin2p3filepath
 import warnings
+import pandas #pandas was not defined in get_aperture
+import dask #dask was not defined in get_aperture
 
 _MINIMAL_COLNAMES = {"gaia_dr2": ['id','ra', 'dec',
+                                  'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
+                                  'x', 'y'], 
+                    "gaia_dr3": ['source_id','ra', 'dec',
                                   'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
                                   'x', 'y']} # index and isolated comes after
 
@@ -110,7 +115,8 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                 radius=np.linspace(2,10,9),
                                 bkgann=[10,11], 
                                 joined=True,
-                                refcat_radius=0.7):
+                                refcat_radius=0.7,
+                                apply_proper_motion=False):
     """ run  aperture photometry on science image given input catalog.
     
     Parameters
@@ -199,7 +205,18 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         else:
             columns = None
             
-        cat = get_img_refcatalog(sciimg, cat, coord=coord, radius=refcat_radius) # this handles dask.
+
+        if apply_proper_motion:
+            # Not compatible with delayed sciimg
+            from astropy.time import Time
+            mjd_cat=Time(sciimg.get_header()['OBSMJD'], format='mjd')
+        else: 
+            mjd_cat=None
+    
+        cat = get_img_refcatalog(sciimg, cat, coord=coord, radius=refcat_radius, 
+                                 apply_proper_motion=apply_proper_motion, 
+                                 mjd_cat=mjd_cat) # this handles dask.
+        
         if columns is not None: #
             if coord == 'ij' : 
                 columns = columns[:-2]+['i','j']
@@ -225,17 +242,26 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
                                         mask=mask,
                                         err=err,
                                         as_dataframe=True)
+    
+    radcols = [f'r_{k}' for k in range(len(radius))]
+    radius = radius.ravel() #Remove broadcasting
+
     if "dask" in str( type(sciimg) ):
         import dask.dataframe as dd
         colnames  = [f'f_{k}' for k in range(len(radius))]
         colnames += [f'f_{k}_e' for k in range(len(radius))]
         colnames += [f'f_{k}_f' for k in range(len(radius))]
+
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         ap_dataframe = dd.from_delayed(ap_dataframe, meta=meta)
+     
+    ap_dataframe = ap_dataframe.astype('float32')    
+    ap_dataframe = ap_dataframe.assign(**{key : val for key, val in zip(radcols, radius)})
         
     if joined:
         cat_ = cat.reset_index()
         merged_cat = cat_.join(ap_dataframe)#.set_index("index")
+        merged_cat[radcols] = radius
         return merged_cat
 
     return ap_dataframe

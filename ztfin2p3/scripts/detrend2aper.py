@@ -78,14 +78,11 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
 
     for quad, out in zip(quads, ipac_filepaths):
-        # Not using build_aperture_photometry cause it expects
-        # filepath and not images. Will change.
         logger.info("aperture photometry for quadrant %d", quad.qid)
         apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
         output_filename = ipacfilename_to_ztfin2p3filepath(
             out, new_suffix=suffix, new_extension="parquet"
         )
-        # FIXME: store radius in the catalog file!
         apcat.to_parquet(output_filename)
         aper_stats[f"quad_{quad.qid}"] = {
             "quad": quad.qid,

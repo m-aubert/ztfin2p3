@@ -52,31 +52,31 @@ def sbatch(
 @click.argument("cmd")
 @click.argument("date")
 @click.option("--to", help="specify the end of the period to process")
-@click.option(
-    "--freq",
-    default="D",
-    help="frequency for date range, D=daily, W=weekly, M=monthly, etc.",
-)
-@click.option("--logdir", default=".", help="path where logs are stored")
-@click.option("--envpath", help="path to the environment where ztfin2p3 is located")
-@click.option("--account", default="ztf", help="account to charge resources to")
-@click.option("--partition", default="htc", help="partition for resource allocation")
+@click.option("--freq", default="D", help="frequency: D=daily, W=weekly, M=monthly")
 @click.option("--dry-run", is_flag=True, help="show slurm command, don't run")
+@click.option("--envpath", help="path to the environment where ztfin2p3 is located")
+@click.option("--logdir", default=".", help="path where logs are stored")
+@click.option("--split-ccds", is_flag=True, help="split CCDs using a job array?")
+# slurm
+@click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
 @click.option("--mem", "-m", default="8GB", help="memory limit")
+@click.option("--partition", default="htc", help="partition for resource allocation")
+#
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def run(
     cmd,
     date,
     to,
     freq,
-    logdir,
+    dry_run,
     envpath,
+    logdir,
+    split_ccds,
     account,
-    partition,
     cpu_time,
     mem,
-    dry_run,
+    partition,
     args,
 ):
     """Run d2a for a DAY or a period on a Slurm cluster."""
@@ -122,9 +122,12 @@ def run(
 
         for day in days:
             date = str(day.date())
-            cmdstr = rf"{ztfcmd} d2a {date} --ccdid \$SLURM_ARRAY_TASK_ID"
-            cmdstr += f" --statsdir {logdir} "
+            cmdstr = f"{ztfcmd} d2a {date} --statsdir {logdir} "
             cmdstr += " ".join(args)
-            srun(cmdstr, array="1-16")
+            if split_ccds:
+                cmdstr += r" --ccdid \$SLURM_ARRAY_TASK_ID"
+                srun(cmdstr, array="1-16")
+            else:
+                srun(cmdstr)
     else:
         raise ValueError("unknown command")

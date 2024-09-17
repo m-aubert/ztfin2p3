@@ -596,7 +596,7 @@ def get_meandata(
     # Should you apply weight on the data ?
     if weights is not None and weights != 1:
         if isinstance(weights, str):
-            weights = getattr(npda, weights)(data, axis=(1, 2))[:, None, None]
+            weights = getattr(npda, weights)(datas, axis=(1, 2))[:, None, None]
         else:
             weights = np.asarray(np.atleast_1d(weights))[:, None, None]  # broadcast
 

@@ -254,17 +254,17 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
 
         meta = pandas.DataFrame(columns=colnames, dtype="float32")
         ap_dataframe = dd.from_delayed(ap_dataframe, meta=meta)
-        ap_dataframe = ap_dataframe.assign(**{key : val for key, val in zip(radcols, radius.astype(np.int32))})
+        ap_dataframe = ap_dataframe.assign(**{key : val for key, val in zip(radcols, radius.astype(np.uint8))})
         # Inplace Column asssignment does not work with Dask-Dataframe. 
         
     else : 
-        ap_dataframe = ap_dataframe.astype('float32') #Limit memory usage when not dask.
-        ap_dataframe[radcols] = radius.astype(np.int32) 
+        ap_dataframe = ap_dataframe.astype('float32') 
+        ap_dataframe[radcols] = radius.astype(np.uint8) 
         
-    ap_dataframe = ap_dataframe.astype({f'f_{k}_f': 'int32' for k in range(len(radius))})
+    ap_dataframe = ap_dataframe.astype({f'f_{k}_f': np.uint8 for k in range(len(radius))})
         
     if joined:
-        cat_ = cat.reset_index()
+        cat_ = cat.reset_index(drop=True) #Dropping to avoid storing index.
         cat_ = cat_.astype({col : 'float32' for col in cat_.columns[cat_.dtypes == 'float64']})
         merged_cat = cat_.join(ap_dataframe)#.set_index("index")
         return merged_cat

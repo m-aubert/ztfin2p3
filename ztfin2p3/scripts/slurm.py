@@ -1,4 +1,4 @@
-import os
+import pathlib
 import subprocess
 
 import pandas as pd
@@ -61,7 +61,7 @@ def sbatch(
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--partition", default="htc", help="partition for resource allocation")
-@click.option("--dry-run", is_flag=True, help="partition for the resource allocation")
+@click.option("--dry-run", is_flag=True, help="show slurm command, don't run")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
 @click.option("--mem", "-m", default="8GB", help="memory limit")
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
@@ -81,6 +81,9 @@ def run(
 ):
     """Run d2a for a DAY or a period on a Slurm cluster."""
 
+    logdir = pathlib.Path(logdir)
+    logdir.mkdir(exist_ok=True)
+
     if envpath:
         ztfcmd = f"{envpath}/bin/ztfin2p3"
     else:
@@ -96,7 +99,7 @@ def run(
             mem=mem,
             account=account,
             partition=partition,
-            output=os.path.join(logdir, logfile),
+            output=logdir / logfile,
             **kwargs,
         )
         if dry_run:

@@ -78,14 +78,11 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
 
     for quad, out in zip(quads, ipac_filepaths):
-        # Not using build_aperture_photometry cause it expects
-        # filepath and not images. Will change.
         logger.info("aperture photometry for quadrant %d", quad.qid)
         apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
         output_filename = ipacfilename_to_ztfin2p3filepath(
             out, new_suffix=suffix, new_extension="parquet"
         )
-        # FIXME: store radius in the catalog file!
         apcat.to_parquet(output_filename)
         aper_stats[f"quad_{quad.qid}"] = {
             "quad": quad.qid,
@@ -101,7 +98,6 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
 @click.option(
     "-c",
     "--ccdid",
-    required=True,
     type=click.IntRange(1, 16),
     help="ccdid in the range 1 to 16",
 )
@@ -161,114 +157,127 @@ def d2a(
     radius = np.arange(radius_min, radius_max)
     steps = steps.split(",")
     now = datetime.datetime.now(datetime.UTC)
+
+    ccdids = list(range(1, 17)) if ccdid is None else [ccdid]
     stats = {
         "date": now.isoformat(),
         "day": day,
-        "ccd": ccdid,
+        "ccd": ccdids,
         "ztfimg_version": ztfimg_version,
         "ztfin2p3_version": ztfin2p3_version,
     }
     tot = time.time()
 
     logger = logging.getLogger(__name__)
-    logger.info("processing day %s, ccd=%s", day, ccdid)
 
-    bi = BiasPipe(day, ccdid=ccdid, nskip=10)
-    if len(bi.df) == 0:
-        logger.warning(f"no bias for {day}")
-        sys.exit(1)
+    for ccdid in ccdids:
+        logger.info("processing day %s, ccd=%s", day, ccdid)
 
-    # Generate master bias:
-    if "bias" in steps:
-        t0 = time.time()
-        bi.build_ccds(reprocess=force, **BIAS_PARAMS)
-        timing = time.time() - t0
-        logger.info("bias done, %.2f sec.", timing)
-        stats["bias"] = {"time": timing}
+        bi = BiasPipe(day, ccdid=ccdid, nskip=10)
+        if len(bi.df) == 0:
+            logger.warning(f"no bias for {day}")
+            sys.exit(1)
 
-    fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
-    if len(fi.df) == 0:
-        logger.warning(f"no flat for {day}")
-        sys.exit(1)
+        # Generate master bias:
+        if "bias" in steps:
+            t0 = time.time()
+            bi.build_ccds(reprocess=force, **BIAS_PARAMS)
+            timing = time.time() - t0
+            logger.info("bias done, %.2f sec.", timing)
+            stats["bias"] = {"time": timing}
 
-    # Generate master flats:
-    if "flat" in steps:
-        t0 = time.time()
-        fi.build_ccds(bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS)
-        timing = time.time() - t0
-        logger.info("flat done, %.2f sec.", timing)
-        stats["flat"] = {"time": timing}
+        fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+        if len(fi.df) == 0:
+            logger.warning(f"no flat for {day}")
+            sys.exit(1)
 
-    stats["science"] = []
-    n_errors = 0
+        # Generate master flats:
+        if "flat" in steps:
+            t0 = time.time()
+            fi.build_ccds(bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS)
+            timing = time.time() - t0
+            logger.info("flat done, %.2f sec.", timing)
+            stats["flat"] = {"time": timing}
 
-    if set(steps) & {"sci", "aper"}:
-        do_aper = "aper" in steps
+        stats["science"] = []
+        n_errors = 0
 
-        # Generate Science :
-        # First browse meta data :
-        rawsci_list = get_raw("science", fi.period, "metadata", ccdid=ccdid)
-        rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
-        rawsci_list = rawsci_list.sort_index()
-        bias = bi.get_ccd(day=day, ccdid=ccdid)
+        if set(steps) & {"sci", "aper"}:
+            do_aper = "aper" in steps
 
-        # iterate over flat filters
-        for _, row in fi.df.iterrows():
-            objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
-            nfiles = len(objects_files)
-            msg = "processing %s filter=%s ccd=%s: %d files"
-            logger.info(msg, row.day, row.filterid, row.ccdid, nfiles)
-            sci_info = {
-                "day": row.day,
-                "filter": row.filterid,
-                "ccd": row.ccdid,
-                "nfiles": nfiles,
-                "files": [],
-            }
-            flat = fi.get_ccd(day=day, ccdid=ccdid, filterid=row.filterid)
+            # Generate Science :
+            # First browse meta data :
+            rawsci_list = get_raw("science", fi.period, "metadata", ccdid=ccdid)
+            rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
+            rawsci_list = rawsci_list.sort_index()
+            bias = bi.get_ccd(day=day, ccdid=ccdid)
 
-            for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
-                raw_file = sci_row.filepath
-                logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
-                t0 = time.time()
-                try:
-                    aper_stats = process_sci(
-                        raw_file, flat, bias, suffix, radius, pocket, do_aper=do_aper
+            # iterate over flat filters
+            for _, row in fi.df.iterrows():
+                objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
+                nfiles = len(objects_files)
+                msg = "processing %s filter=%s ccd=%s: %d files"
+                logger.info(msg, row.day, row.filterid, row.ccdid, nfiles)
+                sci_info = {
+                    "day": row.day,
+                    "filter": row.filterid,
+                    "ccd": row.ccdid,
+                    "nfiles": nfiles,
+                    "files": [],
+                }
+                flat = fi.get_ccd(day=day, ccdid=ccdid, filterid=row.filterid)
+
+                for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
+                    raw_file = sci_row.filepath
+                    logger.info("processing sci %d/%d: %s", i, nfiles, raw_file)
+                    t0 = time.time()
+                    try:
+                        aper_stats = process_sci(
+                            raw_file,
+                            flat,
+                            bias,
+                            suffix,
+                            radius,
+                            pocket,
+                            do_aper=do_aper,
+                        )
+                    except Exception as exc:
+                        if pdb:
+                            raise
+
+                        aper_stats = {}
+                        status, error_msg = "error", str(exc)
+                        n_errors += 1
+                        timing = time.time() - t0
+                        logger.error("sci done, status=%s, %.2f sec.", status, timing)
+                        logger.error("error was: %s", error_msg)
+                    else:
+                        status, error_msg = "ok", ""
+                        timing = time.time() - t0
+                        logger.info("sci done, status=%s, %.2f sec.", status, timing)
+
+                    sci_info["files"].append(
+                        {
+                            "file": raw_file,
+                            "expid": sci_row.expid,
+                            "time": timing,
+                            "status": status,
+                            "error_msg": error_msg,
+                            **aper_stats,
+                        }
                     )
-                except Exception as exc:
-                    if pdb:
-                        raise
 
-                    aper_stats = {}
-                    status, error_msg = "error", str(exc)
-                    n_errors += 1
-                    timing = time.time() - t0
-                    logger.error("sci done, status=%s, %.2f sec.", status, timing)
-                    logger.error("error was: %s", error_msg)
-                else:
-                    status, error_msg = "ok", ""
-                    timing = time.time() - t0
-                    logger.info("sci done, status=%s, %.2f sec.", status, timing)
-
-                sci_info["files"].append(
-                    {
-                        "file": raw_file,
-                        "expid": sci_row.expid,
-                        "time": timing,
-                        "status": status,
-                        "error_msg": error_msg,
-                        **aper_stats,
-                    }
-                )
-
-            stats["science"].append(sci_info)
+                stats["science"].append(sci_info)
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
 
     if statsdir is not None:
         statsdir = pathlib.Path(statsdir)
-        stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
+        if len(ccdids) == 1:
+            stats_file = statsdir / f"stats_{day}_{ccdids[0]}_{now:%Y%M%dT%H%M%S}.json"
+        else:
+            stats_file = statsdir / f"stats_{day}_{now:%Y%M%dT%H%M%S}.json"
         logger.info("writing stats to %s", stats_file)
         stats_file.write_text(json.dumps(stats))
 

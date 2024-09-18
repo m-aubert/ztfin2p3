@@ -39,6 +39,7 @@ FLAT_PARAMS = dict(
 SCI_PARAMS = dict(
     overscan_prop=dict(userange=[25, 30]),
     return_sci_quads=True,
+    store=False,
     with_mask=True,
 )
 APER_PARAMS = dict(

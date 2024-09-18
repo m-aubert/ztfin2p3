@@ -1,4 +1,4 @@
-""" module to handle catalog in the ztfin2p3 pipeline 
+""" module to handle catalog in the ztfin2p3 pipeline
 
 
 
@@ -15,10 +15,10 @@ cat = catalog.get_img_refcatalog(sci, "gaia_dr2")
 """
 
 import os
-import pandas
+import pandas as pd
 import numpy as np
 
-IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/" 
+IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/"
 #"/sps/lsst/datasets/refcats/htm/v1/"
 IN2P3_CATNAME = {"ps1":"ps1_pv3_3pi_20170110",
                  "gaia_dr2":"gaia_dr2_20190808",
@@ -46,27 +46,28 @@ _KNOWN_COLUMNS = {"gaia_dr2": ['id', 'coord_ra', 'coord_dec',
                      }
 
 
-def get_img_refcatalog(img, which, coord='xy', radius=0.7, in_fov=True,
-                           enrich=True, **kwargs):
-    """ fetch an lsst refcats catalog stored at the cc-in2p3 for a given a
-    ztfimg image. 
+def get_img_refcatalog(
+    img, which, coord="xy", radius=0.7, in_fov=True, enrich=True, **kwargs
+):
+    """fetch an lsst refcats catalog stored at the cc-in2p3 for a given a
+    ztfimg image.
 
     Parameters
     ----------
     img: ztfimg.Image, dask.delayed
        a ztfimg.Image. dask is supported either if
-       ztfimg.Image.use_dask is True or 
+       ztfimg.Image.use_dask is True or
        if ztfimg.Image is delayed.
-    
+
     which: str
-        Name of the catalog. 
+        Name of the catalog.
         currently available catalogs:
         - ps1 (pv3_3pi_20170110)
         - gaia_dr2 (20190808)
         - sdss (dr9-fink-v5b)
-        
+
     coord : str
-        Coordinate system to add to aperture catalogue. 
+        Coordinate system to add to aperture catalogue.
         'ij' : ccd
         'xy' : quadrant
 
@@ -111,41 +112,49 @@ def get_img_refcatalog(img, which, coord='xy', radius=0.7, in_fov=True,
                              if col.endswith("_flux") or col.endswith("_fluxErr")]
 
         if not is_delayed: # delayed is made after the xy_added
-            meta = pandas.DataFrame(columns=colnames, dtype="float32")
+            meta = pd.DataFrame(columns=colnames, dtype="float32")
             cat = dd.from_delayed(cat_delayed, meta=meta)
 
     # adding x,y position to catalog
     if is_delayed:
         cat_delayed = img.add_coord_to_catalog(cat_delayed, coord=coord, in_fov=in_fov)
         colnames += [coord[0] , coord[1]] #["x", "y"]
-        meta = pandas.DataFrame(columns=colnames, dtype="float32")
+        meta = pd.DataFrame(columns=colnames, dtype="float32")
         cat = dd.from_delayed(cat_delayed, meta=meta)
-        
+
     else: # work for both no dask or img.use_dask=True
         cat = img.add_coord_to_catalog(cat, coord=coord , in_fov=in_fov)
-        
+
     return cat
 
 
-def get_refcatalog(ra, dec, radius, which, enrich=True,
-                       colnames=None, mjd_cat=None, apply_proper_motion=False):
-    """ fetch an lsst refcats catalog stored at the cc-in2p3.
+def get_refcatalog(
+    ra,
+    dec,
+    radius,
+    which,
+    enrich=True,
+    colnames=None,
+    mjd_cat=None,
+    apply_proper_motion=False,
+):
+    """fetch an lsst refcats catalog stored at the cc-in2p3.
 
     Parameters
     ----------
     ra, dec: float
         central point coordinates in decimal degrees or sexagesimal
-    
+
     radius: float
         radius of circle in degrees
 
     which: str
-        Name of the catalog. 
+        Name of the catalog.
         currently available catalogs:
         - ps1 (pv3_3pi_20170110)
         - gaia_dr2 (20190808)
         - sdss (dr9-fink-v5b)
-    
+
     enrich: bool
         IN2P3 catalog have ra,dec coordinates stored in radian
         as coord_ra/dec and flux in nJy
@@ -160,22 +169,22 @@ def get_refcatalog(ra, dec, radius, which, enrich=True,
     """
     from .utils.tools import get_htm_intersect, njy_to_mag
     from astropy.table import Table
-    
+
     if which not in IN2P3_CATNAME:
         raise NotImplementedError(f" Only {list(IN2P3_CATNAME.keys())} CC-IN2P3 catalogs implemented ; {which} given")
-    
+
     if which=='gaia_dr3':
         from .utils.tools import get_healpix_intersect
 
         dirpath = "/sps/ztf/data/calibrator/gaia_dr3_astro/" #Hard-coded for now.
         pix_id = get_healpix_intersect(ra, dec, radius, nside=64)
-        if colnames is None : 
+        if colnames is None:
             colnames = _KNOWN_COLUMNS[which]
 
-        cat = [pandas.read_parquet(os.path.join(dirpath, f"gaiadr3_pix64_{healpix_i}.parquet"),
+        cat = [pd.read_parquet(os.path.join(dirpath, f"gaiadr3_pix64_{healpix_i}.parquet"),
                                    columns=colnames)
-                  for healpix_i in pix_id]
-        cat = pandas.concat(cat).reset_index(drop=True)
+               for healpix_i in pix_id]
+        cat = pd.concat(cat).reset_index(drop=True)
 
         if apply_proper_motion:
             # nan pms are replaced by 0 so that we don't loose these stars
@@ -185,13 +194,18 @@ def get_refcatalog(ra, dec, radius, which, enrich=True,
             from astropy.time import Time
             import astropy.units as u
             from astropy.coordinates import SkyCoord
-            c = SkyCoord(cat.ra.values,cat.dec.values, unit=(u.deg, u.deg), 
-                 equinox=f'J2000',
-                 pm_ra_cosdec=cat.pmra.values* u.mas/u.yr,
-                 pm_dec=cat.pmdec.values* u.mas/u.yr,
-                 obstime=Time('J2016'))
+
+            c = SkyCoord(
+                cat.ra.values,
+                cat.dec.values,
+                unit=(u.deg, u.deg),
+                equinox="J2000",
+                pm_ra_cosdec=cat.pmra.values * u.mas / u.yr,
+                pm_dec=cat.pmdec.values * u.mas / u.yr,
+                obstime=Time("J2016"),
+            )
             if mjd_cat is None:
-                raise ValueError(f"mjd_cat is None here, it should be the data to which we want to move the position using proper motion (in MJD)")
+                raise ValueError("mjd_cat is None here, it should be the data to which we want to move the position using proper motion (in MJD)")
             else:
                 c_obs_epoch = c.apply_space_motion(mjd_cat)
                 cat['dec']=c_obs_epoch.dec.deg
@@ -199,29 +213,40 @@ def get_refcatalog(ra, dec, radius, which, enrich=True,
 
     else:
         if apply_proper_motion:
-            raise NotImplementedError(f" Only gaia_dr3 catalog can handle proper motion for now. {which} given")
+            raise NotImplementedError(
+                f"Only gaia_dr3 catalog can handle proper motion for now. {which} given"
+            )
 
         hmt_id = get_htm_intersect(ra, dec, radius, depth=7)
         catpath = os.getenv("ZTFREFCAT", IN2P3_LOCATION)
         dirpath = os.path.join(catpath, IN2P3_CATNAME[which])
         # all tables
-        tables = [Table.read(os.path.join(dirpath, f"{htm_id_}.fits"),
-                            unit_parse_strict='silent')
-                for htm_id_ in hmt_id]
+        tables = [
+            Table.read(
+                os.path.join(dirpath, f"{htm_id_}.fits"),
+                unit_parse_strict="silent",
+                mask_invalid=False,
+            )
+            for htm_id_ in hmt_id
+        ]
+
         # table.to_pandas() only accepts single-value columns.
         if colnames is None:
-            t_ = tables[0] # test table 
-            colnames = [name for name in t_.colnames if len(t_[name].shape) <= 1] # assume all tables have the same format.
-            
-        cat = pandas.concat([t_[colnames].to_pandas() for t_ in tables]).reset_index(drop=True)
+            # assume all tables have the same format.
+            t_ = tables[0]
+            colnames = [col.name for col in t_.itercols() if col.ndim == 1]
+
+        cat = pd.concat([t_[colnames].to_pandas() for t_ in tables]).reset_index(drop=True)
+
         if enrich:
             # - ra, dec in degrees
-            cat[["ra","dec"]] = cat[["coord_ra","coord_dec"]]*180/np.pi
+            cat["ra"] = cat["coord_ra"] * (180 / np.pi)
+            cat["dec"] = cat["coord_dec"] * (180 / np.pi)
             # - mags
             fluxcol = [col for col in  cat.columns if col.endswith("_flux")]
             fluxcolerr = [col for col in  cat.columns if col.endswith("_fluxErr")]
             magcol = [col.replace("_flux","_mag") for col in fluxcol]
             magcolerr = [col.replace("_flux","_mag") for col in fluxcolerr]
             cat[magcol], cat[magcolerr] = njy_to_mag( cat[fluxcol].values,cat[fluxcolerr].values )
-            
+
     return cat

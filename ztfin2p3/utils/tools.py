@@ -118,10 +118,10 @@ def njy_to_mag(njy_, njyerr_=None):
     """
     with np.errstate(divide="ignore"):
         # ignore "divide by zero encountered in log10" warning for null fluxes
-        mags = -2.5*np.log10(njy_*10**(-9)/3631)
+        mags = -2.5 * np.log10(1e-9 / 3631 * njy_)
     if njyerr_ is None:
         return mags
-    dmags = +2.5/np.log(10) * njyerr_ / njy_
+    dmags = 2.5 / np.log(10) * njyerr_ / njy_
     return mags, dmags
 
 

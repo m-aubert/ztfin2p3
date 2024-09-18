@@ -18,6 +18,8 @@ import os
 import pandas as pd
 import numpy as np
 
+from ztfquery.io import LOCALSOURCE
+
 IN2P3_LOCATION = "/sps/lsst/datasets/refcats/htm/v1/"
 #"/sps/lsst/datasets/refcats/htm/v1/"
 IN2P3_CATNAME = {"ps1":"ps1_pv3_3pi_20170110",
@@ -176,7 +178,7 @@ def get_refcatalog(
     if which=='gaia_dr3':
         from .utils.tools import get_healpix_intersect
 
-        dirpath = "/sps/ztf/data/calibrator/gaia_dr3_astro/" #Hard-coded for now.
+        dirpath = os.path.join(LOCALSOURCE, "calibrator", "gaia_dr3_astro")
         pix_id = get_healpix_intersect(ra, dec, radius, nside=64)
         if colnames is None:
             colnames = _KNOWN_COLUMNS[which]

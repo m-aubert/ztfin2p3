@@ -10,8 +10,8 @@ import pandas
 from astropy import time
 from astropy.io import fits
 from ztfquery.buildurl import parse_filename
+from ztfquery.io import LOCALSOURCE
 
-from .io import LOCALSOURCE
 from .utils.tools import parse_singledate
 
 __all__ = ["get_metadata"]

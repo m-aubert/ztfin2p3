@@ -277,7 +277,6 @@ def d2a(
                             **aper_stats,
                         }
                     )
-                    break
 
                 stats["science"].append(sci_info)
 

@@ -43,7 +43,8 @@ SCI_PARAMS = dict(
     with_mask=True,
 )
 APER_PARAMS = dict(
-    cat="gaia_dr2",
+    cat="gaia_dr3",
+    apply_proper_motion=True,
     as_path=False,
     minimal_columns=True,
     seplimit=20,
@@ -105,7 +106,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
 @click.option("--steps", default="bias,flat,sci,aper", help="steps to run")
 @click.option("--statsdir", help="path where statistics are stored")
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
-@click.option("--radius-max", type=int, default=12, help="maximum aperture radius")
+@click.option("--radius-max", type=int, default=13, help="maximum aperture radius")
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--pocket", is_flag=True, help="apply pocket correction?")
 @click.option("--use-closest-calib", is_flag=True, help="use closest calib?")

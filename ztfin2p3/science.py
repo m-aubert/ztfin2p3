@@ -540,6 +540,8 @@ def find_closest_calib_file(
     max_timedelta="1w",
 ):
     """Use master bias/flat catalogs to find the closest one in time."""
+
+    logger = logging.getLogger(__name__)
     CAL = pathlib.Path(CAL_DIR)
     meta_file = CAL / kind / "meta" / f"master{kind}_metadata_{year}.parquet"
     if not meta_file.exists():
@@ -565,9 +567,13 @@ def find_closest_calib_file(
 
     item = df.iloc[idx[0]]
     if kind == "bias":
-        return get_daily_biasfile(item.PERIOD, ccdid)
+        filepath = get_daily_biasfile(item.PERIOD, ccdid)
+        logger.debug("found master bias: %s", filepath)
+        return filepath
     elif kind == "flat":
-        return get_daily_flatfile(item.PERIOD, ccdid, filtername=filtername)
+        filepath = get_daily_flatfile(item.PERIOD, ccdid, filtername=filtername)
+        logger.debug("found master flat: %s", filepath)
+        return filepath
 
 
 def is_array(x):

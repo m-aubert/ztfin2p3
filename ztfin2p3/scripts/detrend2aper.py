@@ -107,6 +107,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
 @click.option("--radius-max", type=int, default=12, help="maximum aperture radius")
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--pocket", is_flag=True, help="apply pocket correction?")
+@click.option("--use-closest-calib", is_flag=True, help="use closest calib?")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
 @click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
@@ -119,6 +120,7 @@ def d2a(
     radius_max,
     suffix,
     pocket,
+    use_closest_calib,
     force,
     debug,
     pdb,
@@ -173,31 +175,34 @@ def d2a(
     for ccdid in ccdids:
         logger.info("processing day %s, ccd=%s", day, ccdid)
 
-        bi = BiasPipe(day, ccdid=ccdid, nskip=10)
-        if len(bi.df) == 0:
-            logger.warning(f"no bias for {day}")
-            sys.exit(1)
+        if use_closest_calib:
+            bi = fi = None
+        else:
+            bi = BiasPipe(day, ccdid=ccdid, nskip=10)
+            if len(bi.df) == 0:
+                logger.warning(f"no bias for {day}")
 
-        # Generate master bias:
-        if "bias" in steps:
-            t0 = time.time()
-            bi.build_ccds(reprocess=force, **BIAS_PARAMS)
-            timing = time.time() - t0
-            logger.info("bias done, %.2f sec.", timing)
-            stats["bias"] = {"time": timing}
+            # Generate master bias:
+            if "bias" in steps:
+                t0 = time.time()
+                bi.build_ccds(reprocess=force, **BIAS_PARAMS)
+                timing = time.time() - t0
+                logger.info("bias done, %.2f sec.", timing)
+                stats["bias"] = {"time": timing}
 
-        fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
-        if len(fi.df) == 0:
-            logger.warning(f"no flat for {day}")
-            sys.exit(1)
+            fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+            if len(fi.df) == 0:
+                logger.warning(f"no flat for {day}")
 
-        # Generate master flats:
-        if "flat" in steps:
-            t0 = time.time()
-            fi.build_ccds(bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS)
-            timing = time.time() - t0
-            logger.info("flat done, %.2f sec.", timing)
-            stats["flat"] = {"time": timing}
+            # Generate master flats:
+            if "flat" in steps:
+                t0 = time.time()
+                fi.build_ccds(
+                    bias=bi, reprocess=force, corr_pocket=pocket, **FLAT_PARAMS
+                )
+                timing = time.time() - t0
+                logger.info("flat done, %.2f sec.", timing)
+                stats["flat"] = {"time": timing}
 
         stats["science"] = []
         n_errors = 0
@@ -207,25 +212,30 @@ def d2a(
 
             # Generate Science :
             # First browse meta data :
-            rawsci_list = get_raw("science", fi.period, "metadata", ccdid=ccdid)
+            rawsci_list = get_raw("science", day, "metadata", ccdid=ccdid)
+            filterids = rawsci_list.filtercode.unique()
             rawsci_list.set_index(["day", "filtercode", "ccdid"], inplace=True)
             rawsci_list = rawsci_list.sort_index()
-            bias = bi.get_ccd(day=day, ccdid=ccdid)
+            bias = bi.get_ccd(day=day, ccdid=ccdid) if bi is not None else None
 
             # iterate over flat filters
-            for _, row in fi.df.iterrows():
-                objects_files = rawsci_list.loc[row.day, row.filterid, row.ccdid]
+            for filterid in filterids:
+                objects_files = rawsci_list.loc[day, filterid, ccdid]
                 nfiles = len(objects_files)
                 msg = "processing %s filter=%s ccd=%s: %d files"
-                logger.info(msg, row.day, row.filterid, row.ccdid, nfiles)
+                logger.info(msg, day, filterid, ccdid, nfiles)
                 sci_info = {
-                    "day": row.day,
-                    "filter": row.filterid,
-                    "ccd": row.ccdid,
+                    "day": day,
+                    "filter": filterid,
+                    "ccd": ccdid,
                     "nfiles": nfiles,
                     "files": [],
                 }
-                flat = fi.get_ccd(day=day, ccdid=ccdid, filterid=row.filterid)
+                flat = (
+                    fi.get_ccd(day=day, ccdid=ccdid, filterid=filterid)
+                    if fi is not None
+                    else None
+                )
 
                 for i, (_, sci_row) in enumerate(objects_files.iterrows(), start=1):
                     raw_file = sci_row.filepath
@@ -266,6 +276,7 @@ def d2a(
                             **aper_stats,
                         }
                     )
+                    break
 
                 stats["science"].append(sci_info)
 

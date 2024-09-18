@@ -288,11 +288,10 @@ def build_science_data(
     rawfile: str
         filename or filepath of a raw image.
 
-    flat, bias: str, ztfimg.CCD, array
+    flat, bias: str, ztfimg.CCD
         ccd data to calibrate the rawimage
         str: filepath
         ccd: ccd object containing the data
-        array: numpy or dask array
 
     dask_level: None, "medium", "deep"
         should this use dask and how ?
@@ -328,17 +327,16 @@ def build_science_data(
 
     # Generic I/O for flat and bias
     if isinstance(flat, str):
-        flatfile = flat
-        flat = ztfimg.CCD.from_filename(flat, as_path=True,
-                                        use_dask=use_dask).get_data()
-    elif isinstance(flat, ztfimg.CCD):
+        flat = ztfimg.CCD.from_filename(flat, as_path=True, use_dask=use_dask)
+
+    if isinstance(flat, ztfimg.CCD):
         flatfile = flat.filepath
-        flat = flat.get_data()
-    elif not is_array(flat):  # numpy or dask
+        flat_data = flat.get_data()
+    else:  # numpy or dask
         raise ValueError(f"Cannot parse the input flat type ({type(flat)})")
 
     if flat_coef is not None:
-        flat *= flat_coef
+        flat_data *= flat_coef
 
     if fp_flatfield:
         fp_flat_norm = get_fp_norm(flat.filepath)/flat.header['FLTNORM']
@@ -377,9 +375,9 @@ def build_science_data(
                                              shape=ztfimg.RawCCD.SHAPE)
 
     # calib_data = XXX # Pixel bias correction comes here
-    calib_data -= bias # bias correction
-    calib_data /= flat # flat correction
-    if fp_flatfield :
+    calib_data -= bias  # bias correction
+    calib_data /= flat_data  # flat correction
+    if fp_flatfield:
         calib_data *= fp_flat_norm
 
     # CCD object to accurately split the data.
@@ -505,28 +503,32 @@ def header_from_quadrantheader(
 
 
 def get_fp_norm(flat_file):
-    try :
-        fp_flats_norms = fits.getval(flat_file, 'FLTNORM_FP')
+    try:
+        return fits.getval(flat_file, "HIERARCH FLTNORM_FP")
     except KeyError:
-        fp_flats_norms = []
-        for i in range(1,17) :
-            tmp = flat_file.split('_')
-            tmp[-3] = f'c{i:02d}'
-            flat = '_'.join(tmp)
-            try :
-                fp_flats_norms.append(ztfimg.CCD.from_filename(flat).get_data()*fits.getval(flat_file, 'FLTNORM'))
-            except OSError:
-                continue
+        pass
 
-        fp_flats_norms = np.median(fp_flats_norms)
-        for i in range(1,17) :
-            tmp = flat_file.split('_')
-            tmp[-3] = f'c{i:02d}'
-            flat = '_'.join(tmp)
-            try :
-                fits.setval(flat, 'FLTNORM_FP', value=fp_flats_norms)
-            except OSError:
-                continue
+    tmp = flat_file.split("_")
+    tmp[-3] = "c{:02d}"
+    flat_pattern = "_".join(tmp)
+
+    fp_flats_norms = []
+    for i in range(1, 17):
+        tmpfile = flat_pattern.format(i)
+        try:
+            ccd = ztfimg.CCD.from_filename(tmpfile)
+            fp_flats_norms.append(ccd.get_data() * ccd.header["FLTNORM"])
+        except OSError:
+            continue
+
+    fp_flats_norms = np.median(fp_flats_norms)
+
+    for i in range(1, 17):
+        tmpfile = flat_pattern.format(i)
+        try:
+            fits.setval(tmpfile, "HIERARCH FLTNORM_FP", value=fp_flats_norms)
+        except OSError:
+            continue
 
     return fp_flats_norms
 

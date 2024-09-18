@@ -37,6 +37,7 @@ FLAT_PARAMS = dict(
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 SCI_PARAMS = dict(
+    fp_flatfield=True,
     overscan_prop=dict(userange=[25, 30]),
     return_sci_quads=True,
     store=False,

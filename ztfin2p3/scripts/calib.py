@@ -8,21 +8,21 @@ from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import compute_fp_norm
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
+
+CLIPPING_PROP = dict(
+    maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+)
 BIAS_PARAMS = dict(
     sigma_clip=3,
     mergedhow="nanmean",
-    clipping_prop=dict(
-        maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-    ),
+    clipping_prop=CLIPPING_PROP,
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 FLAT_PARAMS = dict(
     corr_pocket=False,
     sigma_clip=3,
     mergedhow="nanmean",
-    clipping_prop=dict(
-        maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-    ),
+    clipping_prop=CLIPPING_PROP,
     get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 )
 

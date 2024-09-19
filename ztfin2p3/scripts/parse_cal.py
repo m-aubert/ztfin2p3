@@ -41,7 +41,8 @@ def parse_tree(
 
 @click.command(context_settings={"show_default": True})
 @click.argument("year", nargs=-1)
-def parse_cal(year):
+@click.option("--clean", is_flag=True, help="keep only complete days?")
+def parse_cal(year, clean):
     """Parse calibration folder to produce catalogs."""
 
     CAL = pathlib.Path(CAL_DIR)
@@ -49,5 +50,32 @@ def parse_cal(year):
     FLAT = CAL / "flat"
 
     for y in year:
-        parse_tree(BIAS / y, outfile=BIAS / "meta" / f"masterbias_metadata_{y}.parquet")
-        parse_tree(FLAT / y, outfile=FLAT / "meta" / f"masterflat_metadata_{y}.parquet")
+        bias = parse_tree(BIAS / y)
+        flat = parse_tree(FLAT / y)
+        print(f"{len(bias)} bias, {len(flat)}")
+
+        if clean:
+            print("removal incomplete days")
+            dates = pd.date_range(f"{y}-01-01", f"{y}-12-31", freq="D")
+            df = pd.DataFrame(dates.astype(str).str.replace("-", ""), columns=["date"])
+
+            # count biases
+            df2 = pd.DataFrame(bias.groupby("PERIOD").size(), columns=["nbias"])
+            df = df.join(df2, "date")
+
+            # count flats
+            df2 = flat.pivot_table(
+                index="PERIOD", columns="FILTRKEY", aggfunc="count", values="IMGTYPE"
+            )
+            df = df.join(df2, "date")
+
+            df = df.fillna(0).astype(int)
+            df["tot"] = df[["nbias", "zg", "zi", "zr"]].sum(axis=1)
+
+            to_remove = df[df.tot.lt(64)].date.astype(str).tolist()
+            bias = bias[~bias.PERIOD.isin(to_remove)]
+            flat = flat[~flat.PERIOD.isin(to_remove)]
+            print(f"{len(bias)} bias, {len(flat)}")
+
+        bias.to_parquet(BIAS / "meta" / f"masterbias_metadata_{y}.parquet")
+        flat.to_parquet(FLAT / "meta" / f"masterflat_metadata_{y}.parquet")

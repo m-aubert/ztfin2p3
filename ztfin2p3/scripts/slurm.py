@@ -111,7 +111,7 @@ def run(
             print(out.decode().splitlines()[-1])
 
     if cmd == "parse-cal":
-        cmdstr = f"{ztfcmd} {cmd} {date}" + " ".join(args)
+        cmdstr = f"{ztfcmd} {cmd} {date} " + " ".join(args)
         srun(cmdstr)
 
     elif cmd in ("calib", "d2a"):

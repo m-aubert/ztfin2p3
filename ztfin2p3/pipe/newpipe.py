@@ -218,7 +218,7 @@ class FlatPipe(CalibPipe):
         if suffix is not None:
             self.df.fileout = self.df.fileout.str.replace(".fits", f"_{suffix}.fits")
 
-        if not np.all(self.df.nled == [4, 3, 4]):
+        if {tuple(df.nled) for _, df in self.df.groupby("ccdid")} != {(4, 3, 4)}:
             self.logger.warning("non-standard number of flats per led:")
             self.logger.warning(str(dict(zip(self.df.filterid, self.df.nled))))
 

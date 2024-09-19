@@ -104,7 +104,7 @@ def calib(
         for filterid, df in fi.df.groupby("filterid"):
             logger.debug("filter=%s, %d flats", filterid, len(df))
             assert len(df) == 16
-            stats["flat norm"][filterid] = compute_fp_norm(df.fileout.tolist())
+            stats["flat norm"][filterid] = float(compute_fp_norm(df.fileout.tolist()))
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])

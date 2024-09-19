@@ -339,7 +339,7 @@ def build_science_data(
         flat_data *= flat_coef
 
     if fp_flatfield:
-        fp_flat_norm = get_fp_norm(flat.filepath)/flat.header['FLTNORM']
+        fp_flat_norm = flat.header['HIERARCH FLTNORM_FP'] / flat.header['FLTNORM']
 
     # bias
     if isinstance(bias, str):
@@ -502,33 +502,16 @@ def header_from_quadrantheader(
     return newheader
 
 
-def get_fp_norm(flat_file):
-    try:
-        return fits.getval(flat_file, "HIERARCH FLTNORM_FP")
-    except KeyError:
-        pass
-
-    tmp = flat_file.split("_")
-    tmp[-3] = "c{:02d}"
-    flat_pattern = "_".join(tmp)
-
+def compute_fp_norm(flat_files):
     fp_flats_norms = []
-    for i in range(1, 17):
-        tmpfile = flat_pattern.format(i)
-        try:
-            ccd = ztfimg.CCD.from_filename(tmpfile)
-            fp_flats_norms.append(ccd.get_data() * ccd.header["FLTNORM"])
-        except OSError:
-            continue
+    for filepath in flat_files:
+        ccd = ztfimg.CCD.from_filename(filepath)
+        fp_flats_norms.append(ccd.get_data() * ccd.header["FLTNORM"])
 
     fp_flats_norms = np.median(fp_flats_norms)
 
-    for i in range(1, 17):
-        tmpfile = flat_pattern.format(i)
-        try:
-            fits.setval(tmpfile, "HIERARCH FLTNORM_FP", value=fp_flats_norms)
-        except OSError:
-            continue
+    for filepath in flat_files:
+        fits.setval(filepath, "HIERARCH FLTNORM_FP", value=fp_flats_norms)
 
     return fp_flats_norms
 

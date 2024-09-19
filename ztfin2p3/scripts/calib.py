@@ -5,6 +5,7 @@ import time
 import rich_click as click
 
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
+from ztfin2p3.science import compute_fp_norm
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
 BIAS_PARAMS = dict(
@@ -96,7 +97,14 @@ def calib(
             logger.error("failed: %s", e)
             n_errors += 1
 
-    # TODO: compute flat fp norm
+    if n_errors == 0:
+        logger.info("compute flat fp norm")
+        stats["flat norm"] = {}
+        fi = FlatPipe(day, suffix=suffix)
+        for filterid, df in fi.df.groupby("filterid"):
+            logger.debug("filter=%s, %d flats", filterid, len(df))
+            assert len(df) == 16
+            stats["flat norm"][filterid] = compute_fp_norm(df.fileout.tolist())
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])
@@ -105,4 +113,4 @@ def calib(
         save_stats(stats, statsdir, day)
 
     if n_errors > 0:
-        logger.warning("%d sci files failed", n_errors)
+        logger.error("%d errors", n_errors)

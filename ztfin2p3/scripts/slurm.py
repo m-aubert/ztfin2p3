@@ -111,10 +111,10 @@ def run(
             print(out.decode().splitlines()[-1])
 
     if cmd == "parse-cal":
-        cmdstr = f"{ztfcmd} {cmd} {date}" + " ".join(args)
+        cmdstr = f"{ztfcmd} {cmd} {date} " + " ".join(args)
         srun(cmdstr)
 
-    elif cmd == "d2a":
+    elif cmd in ("calib", "d2a"):
         if to is not None:
             days = pd.date_range(date, to, freq=freq)
         else:
@@ -122,7 +122,7 @@ def run(
 
         for day in days:
             date = str(day.date())
-            cmdstr = f"{ztfcmd} d2a {date} --statsdir {logdir} "
+            cmdstr = f"{ztfcmd} {cmd} {date} --statsdir {logdir} "
             cmdstr += " ".join(args)
             if split_ccds:
                 cmdstr += r" --ccdid \$SLURM_ARRAY_TASK_ID"

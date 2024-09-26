@@ -567,7 +567,7 @@ def get_mskdata(filename):
 
 def exception_mask(filename, suffix): 
     fname_mask = filename_to_url(filename, suffix=suffix, source="local")
-    mksdata = None
+    mskdata = None
     try : 
         mskdata = fits.getdata(fname_mask)   
 

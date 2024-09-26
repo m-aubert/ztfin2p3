@@ -249,10 +249,7 @@ def build_science_image(
         for data, header, fname in zip(new_data, new_header, new_filenames):
             quad = ztfimg.ScienceQuadrant(data=data, header=header)
             if with_mask:
-                fname_mask = filename_to_url(
-                    fname, suffix="mskimg.fits.gz", source="local"
-                )
-                quad.set_mask(fits.getdata(fname_mask))
+                quad.set_mask(get_mskdata(fname))
             quads.append(quad)
         return quads
     elif store:
@@ -409,9 +406,9 @@ def exception_header(file_):
     if hdr is None:
         try:
             hdr = fits.getheader(file_)
+            hdr.strip()
         except Exception as e:
             logging.getLogger(__name__).warn("%s", e)
-        hdr.strip()
     return hdr
 
 
@@ -560,6 +557,24 @@ def find_closest_calib_file(
         logger.debug("found master flat: %s", filepath)
         return filepath
 
+
+def get_mskdata(filename):
+    mskdata = exception_mask(filename,"mskimg.fits.gz")
+    if mskdata is None : 
+        mskdata = exception_mask(filename,"mskimg.fits")
+    
+    return mskdata
+
+def exception_mask(filename, suffix): 
+    fname_mask = filename_to_url(filename, suffix=suffix, source="local")
+    mksdata = None
+    try : 
+        mskdata = fits.getdata(fname_mask)   
+
+    except Exception as e:
+        logging.getLogger(__name__).warn("%s", e)
+
+    return mskdata
 
 def is_array(x):
     """Test if variable is a Numpy or Dask array."""

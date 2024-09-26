@@ -6,7 +6,7 @@ import numpy as np
 import rich_click as click
 from ztfquery.buildurl import get_scifile_of_filename
 
-from ztfin2p3.aperture import get_aperture_photometry
+from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_raw
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
@@ -55,7 +55,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
         output_filename = ipacfilename_to_ztfin2p3filepath(
             out, new_suffix=suffix, new_extension="parquet"
         )
-        apcat.to_parquet(output_filename)
+        _ = store_aperture_catalog(apcat, output_filename)
         aper_stats[f"quad_{quad.qid}"] = {
             "quad": quad.qid,
             "naper": len(apcat),

@@ -153,10 +153,10 @@ def run(
             corr_pocket = day >= pd.to_datetime("20191022")
             if corr_pocket:
                 chunk_size = 100
-                cpu_time = "03:00:00"
+                cpu_time = "04:00:00"
             else:
                 chunk_size = 200
-                cpu_time = "02:00:00"
+                cpu_time = "03:00:00"
 
             for ccdid, nfiles in row.items():
                 n_chunks = nfiles // chunk_size + (1 if nfiles % chunk_size else 0)

@@ -60,7 +60,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
         else:
             apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
             output_filename = ipacfilename_to_ztfin2p3filepath(
-                out, new_suffix=suffix, new_extension="parquet"
+                out, new_suffix=suffix or "apcat", new_extension="parquet"
             )
             store_aperture_catalog(apcat, output_filename)
 
@@ -85,7 +85,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
 @click.option("--radius-max", type=int, default=13, help="maximum aperture radius")
 @click.option("--statsdir", help="path where statistics are stored")
-@click.option("--suffix", help="suffix for output science files")
+@click.option("--suffix", help="suffix for output catalogs")
 @click.option("--use-closest-calib", is_flag=True, help="use closest calib?")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -155,7 +155,7 @@ def d2a(
         if len(bi.df) == 0:
             raise Exception(f"no bias for {day}")
 
-        fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+        fi = FlatPipe(day, ccdid=ccdid)
         if len(fi.df) == 0:
             raise Exception(f"no flat for {day}")
 

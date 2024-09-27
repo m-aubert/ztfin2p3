@@ -74,11 +74,13 @@ def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
 @click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option("-c", "--ccdid", type=click.IntRange(1, 16), help="ccdid [1-16]")
-@click.option("--statsdir", help="path where statistics are stored")
-@click.option("--suffix", help="suffix for output science files")
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
+@click.option("--chunk-id", type=int, help="chunk id")
+@click.option("--chunk-size", type=int, help="chunk size")
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
 @click.option("--radius-max", type=int, default=13, help="maximum aperture radius")
+@click.option("--statsdir", help="path where statistics are stored")
+@click.option("--suffix", help="suffix for output science files")
 @click.option("--use-closest-calib", is_flag=True, help="use closest calib?")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -86,11 +88,13 @@ def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
 def d2a(
     day,
     ccdid,
-    statsdir,
-    suffix,
     aper,
+    chunk_id,
+    chunk_size,
     radius_min,
     radius_max,
+    statsdir,
+    suffix,
     use_closest_calib,
     force,
     debug,
@@ -99,11 +103,14 @@ def d2a(
     """Detrending to Aperture pipeline for a given day.
 
     \b
-    Process DAY (must be specified in YYYY-MM-DD format):
-    - computer master bias
-    - computer master flat
-    - for all science exposures, apply master bias and master flat, and run
-      aperture photometry.
+    Process DAY (YYYY-MM-DD or YYYYMMDD):
+    - by default for all CCDs (use --ccdid to process only one).
+    - detrending: apply master bias and master flat either from the current day
+      or finding the ones from the closest day if --use-closest-calib.
+    - aperture photometry (if --aper).
+
+    The list of files to process can be splitted in chunks with --chunk-id and
+    --chunk--size.
 
     """
 
@@ -117,14 +124,20 @@ def d2a(
     n_errors = 0
     day = day.replace("-", "")
     radius = np.arange(radius_min, radius_max)
+    stats = init_stats(day=day, ccd=ccdid, science=[])
 
     rawsci_list = get_rawmeta("science", day, ccdid=ccdid)
     nfiles = len(rawsci_list)
-
-    stats = init_stats(day=day, ccd=ccdid, nfiles=nfiles)
-    stats["science"] = []
-
     logger.info("processing day %s, ccd=%s: %d files", day, ccdid, nfiles)
+
+    if chunk_id is not None and chunk_size is not None:
+        selection = slice(chunk_id * chunk_size, (chunk_id + 1) * chunk_size)
+        rawsci_list = rawsci_list.iloc[selection]
+        nfiles = len(rawsci_list)
+        logger.info("processing chunk %d, %s, %d files", chunk_id, selection, nfiles)
+        stats["chunk"] = [selection.start, selection.stop]
+
+    stats["nfiles"] = nfiles
 
     if use_closest_calib:
         bi = fi = None
@@ -179,7 +192,6 @@ def d2a(
         sci_info.update({"time": timing, "status": status, "error_msg": error_msg})
         sci_info.update(aper_stats)
         stats["science"].append(sci_info)
-        break
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])

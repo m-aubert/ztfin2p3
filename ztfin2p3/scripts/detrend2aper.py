@@ -3,6 +3,7 @@ import sys
 import time
 
 import numpy as np
+import pandas as pd
 import rich_click as click
 from ztfquery.buildurl import get_scifile_of_filename
 
@@ -14,7 +15,6 @@ from ztfin2p3.science import build_science_image
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
 SCI_PARAMS = dict(
-    corr_pocket=True,
     fp_flatfield=True,
     overscan_prop=dict(userange=[25, 30]),
     return_sci_quads=True,
@@ -33,10 +33,15 @@ APER_PARAMS = dict(
 )
 
 
-def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
+def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
     logger = logging.getLogger(__name__)
     quads = build_science_image(
-        rawfile, flat, bias, newfile_dict=dict(new_suffix=suffix), **SCI_PARAMS
+        rawfile,
+        flat,
+        bias,
+        corr_pocket=corr_pocket,
+        newfile_dict=dict(new_suffix=suffix),
+        **SCI_PARAMS,
     )
 
     aper_stats = {}
@@ -139,6 +144,10 @@ def d2a(
 
     stats["nfiles"] = nfiles
 
+    # pocket effect correction after 20191022
+    corr_pocket = pd.to_datetime(day) >= pd.to_datetime("20191022")
+    stats["corr_pocket"] = corr_pocket
+
     if use_closest_calib:
         bi = fi = None
     else:
@@ -159,8 +168,8 @@ def d2a(
         )
         raw_file = row.filepath
 
-        msg = "processing sci %d/%d, filter=%s ccd=%s: %s"
-        logger.info(msg, i, nfiles, row.filtercode, row.ccdid, raw_file)
+        msg = "processing sci %d/%d filter=%s ccd=%s pocket=%s: %s"
+        logger.info(msg, i, nfiles, row.filtercode, row.ccdid, corr_pocket, raw_file)
 
         sci_info = {
             "day": day,
@@ -171,7 +180,15 @@ def d2a(
         }
         t0 = time.time()
         try:
-            aper_stats = process_sci(raw_file, flat, bias, suffix, radius, do_aper=aper)
+            aper_stats = process_sci(
+                raw_file,
+                flat,
+                bias,
+                suffix,
+                radius,
+                corr_pocket=corr_pocket,
+                do_aper=aper,
+            )
         except Exception as exc:
             if pdb:
                 raise

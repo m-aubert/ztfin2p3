@@ -51,7 +51,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
         output_filename = ipacfilename_to_ztfin2p3filepath(
             out, new_suffix=suffix, new_extension="parquet"
         )
-        _ = store_aperture_catalog(apcat, output_filename)
+        store_aperture_catalog(apcat, output_filename)
         aper_stats[f"quad_{quad.qid}"] = {
             "quad": quad.qid,
             "naper": len(apcat),

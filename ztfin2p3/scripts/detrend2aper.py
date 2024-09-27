@@ -8,12 +8,13 @@ from ztfquery.buildurl import get_scifile_of_filename
 
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
-from ztfin2p3.metadata import get_raw, get_rawmeta
+from ztfin2p3.metadata import get_rawmeta
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
 SCI_PARAMS = dict(
+    corr_pocket=True,
     fp_flatfield=True,
     overscan_prop=dict(userange=[25, 30]),
     return_sci_quads=True,
@@ -32,15 +33,10 @@ APER_PARAMS = dict(
 )
 
 
-def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
+def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
     logger = logging.getLogger(__name__)
     quads = build_science_image(
-        rawfile,
-        flat,
-        bias,
-        newfile_dict=dict(new_suffix=suffix),
-        corr_pocket=pocket,
-        **SCI_PARAMS,
+        rawfile, flat, bias, newfile_dict=dict(new_suffix=suffix), **SCI_PARAMS
     )
 
     aper_stats = {}
@@ -73,7 +69,6 @@ def process_sci(rawfile, flat, bias, suffix, radius, pocket, do_aper=True):
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
 @click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
 @click.option("--radius-max", type=int, default=13, help="maximum aperture radius")
-@click.option("--pocket", is_flag=True, help="apply pocket correction?")
 @click.option("--use-closest-calib", is_flag=True, help="use closest calib?")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -86,7 +81,6 @@ def d2a(
     aper,
     radius_min,
     radius_max,
-    pocket,
     use_closest_calib,
     force,
     debug,
@@ -154,15 +148,7 @@ def d2a(
         }
         t0 = time.time()
         try:
-            aper_stats = process_sci(
-                raw_file,
-                flat,
-                bias,
-                suffix,
-                radius,
-                pocket,
-                do_aper=aper,
-            )
+            aper_stats = process_sci(raw_file, flat, bias, suffix, radius, do_aper=aper)
         except Exception as exc:
             if pdb:
                 raise

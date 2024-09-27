@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import os
 import pathlib
 from typing import Any
 
@@ -41,6 +42,8 @@ def init_stats(**kwargs):
         "date": now.isoformat(),
         "ztfimg_version": ztfimg_version,
         "ztfin2p3_version": ztfin2p3_version,
+        "slurm_jobid": os.getenv("SLURM_JOB_ID"),
+        **kwargs,
     }
 
 

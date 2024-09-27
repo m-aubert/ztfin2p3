@@ -15,6 +15,9 @@ cat = catalog.get_img_refcatalog(sci, "gaia_dr2")
 """
 
 import os
+import warnings
+
+import erfa
 import pandas as pd
 import numpy as np
 
@@ -209,7 +212,9 @@ def get_refcatalog(
             if mjd_cat is None:
                 raise ValueError("mjd_cat is None here, it should be the data to which we want to move the position using proper motion (in MJD)")
             else:
-                c_obs_epoch = c.apply_space_motion(mjd_cat)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", erfa.ErfaWarning)
+                    c_obs_epoch = c.apply_space_motion(mjd_cat)
                 cat['dec']=c_obs_epoch.dec.deg
                 cat['ra']=c_obs_epoch.ra.deg
 

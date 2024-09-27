@@ -3,6 +3,7 @@ import subprocess
 
 import pandas as pd
 import rich_click as click
+from ztfin2p3.metadata import get_rawmeta
 
 
 def sbatch(
@@ -60,7 +61,7 @@ def sbatch(
 # slurm
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
-@click.option("--mem", "-m", default="8GB", help="memory limit")
+@click.option("--mem", "-m", default="16GB", help="memory limit")
 @click.option("--partition", default="htc", help="partition for resource allocation")
 #
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
@@ -89,10 +90,14 @@ def run(
     else:
         ztfcmd = "ztfin2p3"
 
-    def srun(cmdstr, array=None, **kwargs):
+    def srun(cmdstr, cpu_time, array=None, ccdid=None, **kwargs):
         logfile = "slurm-%A-%a.log" if array else "slurm-%j.log"
+        name = f"ztf_{cmd}_{date.replace('-', '')}"
+        if ccdid is not None:
+            name += f"_ccd{ccdid}"
+
         sbatch_cmd = sbatch(
-            f"ztf_{cmd}_{date.replace('-', '')}",
+            name,
             cmdstr,
             array=array,
             cpu_time=cpu_time,
@@ -112,9 +117,9 @@ def run(
 
     if cmd == "parse-cal":
         cmdstr = f"{ztfcmd} {cmd} {date} " + " ".join(args)
-        srun(cmdstr)
+        srun(cmdstr, cpu_time)
 
-    elif cmd in ("calib", "d2a"):
+    elif cmd == "calib":
         if to is not None:
             days = pd.date_range(date, to, freq=freq)
         else:
@@ -126,8 +131,44 @@ def run(
             cmdstr += " ".join(args)
             if split_ccds:
                 cmdstr += r" --ccdid \$SLURM_ARRAY_TASK_ID"
-                srun(cmdstr, array="1-16")
+                srun(cmdstr, cpu_time, array="1-16")
             else:
-                srun(cmdstr)
+                srun(cmdstr, cpu_time)
+
+    elif cmd == "d2a":
+        if to is not None:
+            meta = get_rawmeta("science", [date, to], use_dask=False)
+        else:
+            meta = get_rawmeta("science", date, use_dask=False)
+
+        meta.day = pd.to_datetime(meta.day)
+        meta = meta.groupby(["day", "ccdid"]).size().unstack(["ccdid"]).fillna(0)
+        meta = meta.astype(int)
+
+        for day, row in meta.iterrows():
+
+            # cpu_time: ~25s without pocket, >1min with
+            # no pocket: 30s * 200exp = 100min
+            # pocket: 80s * 100exp = 130min
+            corr_pocket = day >= pd.to_datetime("20191022")
+            if corr_pocket:
+                chunk_size = 100
+                cpu_time = "04:00:00"
+            else:
+                chunk_size = 200
+                cpu_time = "03:00:00"
+
+            for ccdid, nfiles in row.items():
+                n_chunks = nfiles // chunk_size + (1 if nfiles % chunk_size else 0)
+
+                date = str(day.date())
+                cmdstr = f"{ztfcmd} {cmd} {date} --statsdir {logdir} "
+                cmdstr += f"-d --aper --use-closest-calib --ccdid {ccdid} "
+                cmdstr += f"--chunk-size {chunk_size} "
+                cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID"
+                # cmdstr += " ".join(args)
+
+                print(f"{date=} {ccdid=} {nfiles=} {n_chunks=} {cpu_time=}")
+                srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}", ccdid=ccdid)
     else:
         raise ValueError("unknown command")

@@ -8,7 +8,6 @@ from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import compute_fp_norm
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
-
 CLIPPING_PROP = dict(
     maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
 )

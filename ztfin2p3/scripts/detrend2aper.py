@@ -45,17 +45,27 @@ def process_sci(rawfile, flat, bias, suffix, radius, do_aper=True):
 
     ipac_filepaths = get_scifile_of_filename(rawfile, source="local")
 
-    for quad, out in zip(quads, ipac_filepaths):
-        logger.info("aperture photometry for quadrant %d", quad.qid)
-        apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
-        output_filename = ipacfilename_to_ztfin2p3filepath(
-            out, new_suffix=suffix, new_extension="parquet"
-        )
-        store_aperture_catalog(apcat, output_filename)
-        aper_stats[f"quad_{quad.qid}"] = {
+    for i, (quad, out) in enumerate(zip(quads, ipac_filepaths), start=1):
+        logger.info("aperture photometry %d (quadrant %s)", i, quad.qid)
+        apcat, error, output_filename = [], "", ""
+        if quad.mask is None:
+            error = "no mask"
+        elif quad.qid is None:
+            error = "no sci header"
+        else:
+            apcat = get_aperture_photometry(quad, radius=radius, **APER_PARAMS)
+            output_filename = ipacfilename_to_ztfin2p3filepath(
+                out, new_suffix=suffix, new_extension="parquet"
+            )
+            store_aperture_catalog(apcat, output_filename)
+
+        if error:
+            logger.error(error)
+        aper_stats[f"quad_{i}"] = {
             "quad": quad.qid,
             "naper": len(apcat),
             "file": output_filename,
+            "error": error,
         }
 
     return aper_stats
@@ -159,6 +169,10 @@ def d2a(
             logger.error("failed: %s", error_msg)
         else:
             status, error_msg = "ok", ""
+
+        if aper and any(d["error"] for d in aper_stats.values()):
+            n_errors += 1
+            status, error_msg = "error", "error in aperture photometry"
 
         timing = time.time() - t0
         logger.info("sci done, status=%s, %.2f sec.", status, timing)

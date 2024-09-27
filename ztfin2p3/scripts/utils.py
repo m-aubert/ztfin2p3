@@ -41,6 +41,7 @@ def init_stats(**kwargs):
         "date": now.isoformat(),
         "ztfimg_version": ztfimg_version,
         "ztfin2p3_version": ztfin2p3_version,
+        **kwargs,
     }
 
 

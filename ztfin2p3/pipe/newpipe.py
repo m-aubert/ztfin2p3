@@ -97,7 +97,9 @@ class CalibPipe:
         for i, row in self.df.iterrows():
             filename = row.fileout
             if reprocess or not os.path.exists(filename):
-                self.logger.info("processing %s %s", self.kind, row.day)
+                self.logger.info(
+                    "processing %s %s (%d files)", self.kind, row.day, len(row.filepath)
+                )
                 data = calib_from_filenames(
                     row["filepath"],
                     corr_overscan=corr_overscan,
@@ -276,6 +278,7 @@ class FlatPipe(CalibPipe):
                 )
                 arrays, norms = [], []
                 for led_filelist in row["filepath"]:
+                    self.logger.debug("%d files", len(led_filelist))
                     data = calib_from_filenames(
                         led_filelist,
                         corr=bias_data,

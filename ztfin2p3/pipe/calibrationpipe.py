@@ -1,14 +1,11 @@
 
 from .basepipe import CalibPipe
-from ..builder import CalibrationBuilder
-from .. import io, __version__
 
 import pandas
 import numpy as np
 import ztfimg
 import dask.array as da
 
-from ztfimg import collection
 # BasePipe has
 #     - config and co.
 #     - datafile and co.

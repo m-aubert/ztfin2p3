@@ -1,6 +1,4 @@
-__version__ = "0.5.0"
-
-
-from .io import get_config
-from .builder import *
-from .pipe import *
+from .io import get_config  # noqa
+from .builder import *  # noqa
+from .pipe import *  # noqa
+from ._version import __version__  # noqa

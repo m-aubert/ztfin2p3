@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=42", "setuptools_scm[toml]>=3.4"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -44,12 +44,11 @@ ztfin2p3 = "ztfin2p3.__main__:cli"
 [tool.setuptools]
 package-dir = {"" = "."}
 
-
-[tool.setuptools.dynamic]
-version = {attr = "ztfin2p3.__version__"}
-
 [tool.setuptools.package-data]
 ztfin2p3 = ["config/*"]
+
+[tool.setuptools_scm]
+write_to = "ztfin2p3/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "docs"]

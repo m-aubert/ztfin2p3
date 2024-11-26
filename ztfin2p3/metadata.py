@@ -617,7 +617,8 @@ class RawFlatMetaData( RawMetaData ):
     #   Super It        #
     # ================= #    
     @classmethod
-    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None, add_filepath=True, **kwargs):
+    def get_metadata(cls, date, ccdid=None, fid=None, ledid=None,
+                     add_filepath=True, add_ledid=True, **kwargs):
         """ General method to access the IRSA metadata given a date or a daterange. 
 
         The format of date is very flexible to quickly get what you need:
@@ -648,7 +649,7 @@ class RawFlatMetaData( RawMetaData ):
         dataframe (IRSA metadata)
         """
         data = super().get_metadata(date, ccdid=ccdid, fid=fid, add_filepath=add_filepath)
-        if 'ledid' not in data.columns:
+        if add_ledid and 'ledid' not in data.columns:
             data = cls._add_ledinfo_to_datafile(data, **kwargs)
 
         if ledid is not None:
@@ -698,7 +699,7 @@ class RawFlatMetaData( RawMetaData ):
         def _get_ledid(fname):
             try:
                 return fits.getval(fname, 'ILUM_LED')
-            except FileNotFoundError as exc:
+            except (FileNotFoundError, KeyError) as exc:
                 warnings.warn(f"could not get ledid: {exc}", UserWarning)
                 return -1
 

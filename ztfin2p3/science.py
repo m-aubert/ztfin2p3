@@ -84,7 +84,7 @@ def build_science_image(
     outpath=None,
     overwrite=True,
     with_mask=False,
-    corr_fringes=True,
+    corr_fringes=False,
     **kwargs,
 ):
     """Top level method to build a single processed image.
@@ -263,7 +263,9 @@ def build_science_image(
                 quad.set_mask(get_mskdata(fname))
 
             if corr_fringes : 
-                from .utils import correct_fringes_zi #Need custom fringez package. For now optional.
+                from .utils import correct_fringes_zi
+                 # Need custom fringez package. For now optional.
+                 # In the future corr_fringes will default to True.
                 corr_data = correct_fringes_zi(quad.data, 
                                                 mask_data=quad.mask, 
                                                 image_path=fname, 

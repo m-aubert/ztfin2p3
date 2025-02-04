@@ -255,9 +255,6 @@ def build_science_image(
         quads = []
 
         for data, header, fname in zip(new_data, new_header, new_filenames):
-            # Comment out manual addition to header. But needs to be added for versioning.
-            #header['masterflat'] = flatfile
-            #header['masterbias'] = biasfile
             quad = ztfimg.ScienceQuadrant(data=data, header=header)
             if with_mask:
                 quad.set_mask(get_mskdata(fname))

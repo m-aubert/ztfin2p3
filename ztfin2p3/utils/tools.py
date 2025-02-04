@@ -169,8 +169,6 @@ def correct_fringes_zi(image_data,
                         mask_data=None, 
                         image_path=None, 
                         trained_model_date='20200723' ):
-    from fringez.fringe import remove_fringe # To keep package optional for now
-    from fringez.utils import return_fringe_model_name
     """
     Function that gets model to apply and corrects i-band
     atmospheric fringes.
@@ -201,7 +199,8 @@ def correct_fringes_zi(image_data,
         ndarray 
             PCA components used to model the fringes.
     """
-
+    from fringez.fringe import remove_fringe # To keep package optional for now
+    from fringez.utils import return_fringe_model_name
 
     fringe_model_path = get_trained_model_path(date=trained_model_date)
     fringe_model = return_fringe_model_name(image_path, fringe_model_path)

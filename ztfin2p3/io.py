@@ -126,16 +126,16 @@ def get_biasfiles(date, ccdid=None):
     
     return filenames
 
+# ================ #
+#                  #
+#      Fringes     #
+#                  #
+# ================ #
 
+def get_trained_model_path(date='20200723'):
+    FRINGE_MODEL_DIR = os.path.join(LOCALSOURCE, "fringe_model")
 
-
-
-
-
-
-
-
-
+    return os.path.join(FRINGE_MODEL_DIR, date)
 
 # ================ #
 #                  #

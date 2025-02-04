@@ -158,3 +158,54 @@ def get_healpix_intersect(ra, dec, radius, nside=64, **kwargs):
     # note that inclusive might return too many pixels, 
     # but otherwise we would often miss some
     return hp.query_disc(nside,vec,radius*np.pi/180,inclusive=True,nest=True,**kwargs)
+
+
+# ----------------------------- #
+#      Fringe correction        #
+# ----------------------------- #
+
+#Here for now until no longer optional
+def correct_fringes_zi(image_data, 
+                        mask_data=None, 
+                        image_path=None, 
+                        trained_model_date='20200723' ):
+    from fringez.fringe import remove_fringe # To keep package optional for now
+    from fringez.utils import return_fringe_model_name
+    """
+    Function that gets model to apply and corrects i-band
+    atmospheric fringes.
+
+    Parameters
+    ----------
+
+    image_data: ndarray
+        Image science data in ndarray format with no reodering (if ztfimg)
+
+    mask_data: ndarray 
+        Raw bitmask of image. Array of ints.
+    
+    image_path: str
+        Filename
+    
+    trained_model_date : str
+        Date format 'YYYYMMDD'. Model training date. Default: "20200723"
+
+    Returns
+    -------
+       ndarray 
+            Cleaned image
+        
+        ndarray 
+            Corrective image of fitted fringes
+
+        ndarray 
+            PCA components used to model the fringes.
+    """
+
+
+    fringe_model_path = get_trained_model_path(date=trained_model_date)
+    fringe_model = return_fringe_model_name(image_path, fringe_model_path)
+
+    image_clean, fringe_bias, fringe_proj = remove_fringe(image_data, fringe_model, mask=mask_data)
+
+    return image_clean, fringe_bias, fringe_proj 

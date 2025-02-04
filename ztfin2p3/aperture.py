@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import ztfimg
+from . import __version__
 from ztfimg.catalog import get_isolated
 from .catalog import get_img_refcatalog
 from .io import ipacfilename_to_ztfin2p3filepath
@@ -267,6 +268,10 @@ def get_aperture_photometry(sciimg, cat="gaia_dr2",
         cat_ = cat.reset_index(drop=True) #Dropping to avoid storing index.
         cat_ = cat_.astype({col : 'float32' for col in cat_.columns[cat_.dtypes == 'float64']})
         merged_cat = cat_.join(ap_dataframe)#.set_index("index")
+        # Manually add version. Should it be current version or Image header version ?
+        # Consider adding master filenames as well ? 
+        #merged_cat['ztfimg_version'] = ztfimg.__version__
+        #merged_cat['ztfin2p3_version'] = __version__
         return merged_cat
 
     return ap_dataframe

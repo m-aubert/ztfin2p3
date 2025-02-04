@@ -84,6 +84,7 @@ def build_science_image(
     outpath=None,
     overwrite=True,
     with_mask=False,
+    corr_fringes=True,
     **kwargs,
 ):
     """Top level method to build a single processed image.
@@ -156,6 +157,9 @@ def build_science_image(
     with_mask : bool
         Read mask file and add it to the ScienceQuadrant object ?
 
+    corr_fringes : bool
+        Correct atmospheric fringes for i-band only.
+
     **kwargs :
         Arguments passed to the ztfimg.RawCCD.get_data of the raw object image.
 
@@ -173,6 +177,9 @@ def build_science_image(
     ccdid, filtername = info["ccdid"], info["filtercode"]
     year, month, day = info["year"], info["month"], info["day"]
     date = pd.to_datetime(f"{year}{month}{day}")
+
+    if corr_fringes and filtername != 'zi':
+        corr_fringes = False
 
     if bias is None:
         biasfile = find_closest_calib_file(
@@ -246,10 +253,25 @@ def build_science_image(
 
     if return_sci_quads:
         quads = []
+
         for data, header, fname in zip(new_data, new_header, new_filenames):
+            # Comment out manual addition to header. But needs to be added for versioning.
+            #header['masterflat'] = flatfile
+            #header['masterbias'] = biasfile
             quad = ztfimg.ScienceQuadrant(data=data, header=header)
             if with_mask:
                 quad.set_mask(get_mskdata(fname))
+
+            if corr_fringes : 
+                from .utils import correct_fringes_zi #Need custom fringez package. For now optional.
+                corr_data = correct_fringes_zi(quad.data, 
+                                                mask_data=quad.mask, 
+                                                image_path=fname, 
+                                                return_img_only=True)[0]
+
+                quad.set_data(corr_data) #Overwrite with data.
+                # Could save model and PCA components if needed.
+
             quads.append(quad)
         return quads
     elif store:
@@ -313,10 +335,14 @@ def build_science_data(
         if given, this will multiply to the flat
         flatused = flat*flatcoef
 
-    Parameters
+    Returns
     ----------
-    list, str, str
-       list of the 2 quadrant data, master bias file, master flat file
+    list
+        Quadrant data list
+    str 
+        Master bias filepath
+    str
+       Master flat filepath
 
     """
     use_dask = dask_level is not None

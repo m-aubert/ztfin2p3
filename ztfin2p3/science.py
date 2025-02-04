@@ -265,7 +265,7 @@ def build_science_image(
                 quad.set_mask(get_mskdata(fname))
 
             if corr_fringes : 
-                from .utils import correct_fringes_zi
+                from .utils.tools import correct_fringes_zi
                  # Need custom fringez package. For now optional.
                  # In the future corr_fringes will default to True.
                 corr_data = correct_fringes_zi(quad.data, 

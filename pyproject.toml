@@ -33,7 +33,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-all = ["HMpTy", "htmcatalog", "paramiko", "scp", "scikit-sparse"]
+all = ["HMpTy", "htmcatalog", "paramiko", "scp", "scikit-sparse",
+        "fringez @ git+https://github.com/m-aubert/fringez.git"]
 
 [project.urls]
 Repository = "https://github.com/MickaelRigault/ztfin2p3"

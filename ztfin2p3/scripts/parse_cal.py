@@ -42,7 +42,8 @@ def parse_tree(
 @click.command(context_settings={"show_default": True})
 @click.argument("year", nargs=-1)
 @click.option("--clean", is_flag=True, help="keep only complete days?")
-def parse_cal(year, clean):
+@click.option("--prefix", is_flag=False, default='',  help="prefix to file")
+def parse_cal(year, clean, prefix):
     """Parse calibration folder to produce catalogs."""
 
     CAL = pathlib.Path(CAL_DIR)
@@ -77,5 +78,5 @@ def parse_cal(year, clean):
             flat = flat[~flat.PERIOD.isin(to_remove)]
             print(f"{len(bias)} bias, {len(flat)}")
 
-        bias.to_parquet(BIAS / "meta" / f"masterbias_metadata_{y}.parquet")
-        flat.to_parquet(FLAT / "meta" / f"masterflat_metadata_{y}.parquet")
+        bias.to_parquet(BIAS / "meta" / f"{prefix}masterbias_metadata_{y}.parquet")
+        flat.to_parquet(FLAT / "meta" / f"{prefix}masterflat_metadata_{y}.parquet")

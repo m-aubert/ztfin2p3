@@ -265,8 +265,7 @@ def build_science_image(
                  # In the future corr_fringes will default to True.
                 corr_data = correct_fringes_zi(quad.data, 
                                                 mask_data=quad.mask, 
-                                                image_path=fname, 
-                                                return_img_only=True)[0]
+                                                image_path=fname)[0]
 
                 quad.set_data(corr_data) #Overwrite with data.
                 # Could save model and PCA components if needed.

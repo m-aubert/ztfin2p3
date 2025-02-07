@@ -181,11 +181,6 @@ def build_science_image(
     if corr_fringes and filtername != 'zi':
         corr_fringes = False
 
-    if corr_fringes and ccdid == 1 : 
-        w_ = "Reverting to no correction for CCDID 1" 
-        logging.getLogger(__name__).warn(w_)
-        corr_fringes = False
-
     if bias is None:
         biasfile = find_closest_calib_file(
             year, date, ccdid, kind="bias", max_timedelta=max_timedelta

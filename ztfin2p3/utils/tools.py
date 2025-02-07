@@ -1,4 +1,5 @@
 import numpy as np
+from ..io import get_trained_model_path
 
 # ================ #
 #                  #

@@ -47,15 +47,18 @@ def init_stats(**kwargs):
     }
 
 
-def save_stats(stats, statsdir, day, ccdid=None):
+def save_stats(stats, statsdir, day=None, ccdid=None):
     logger = logging.getLogger(__name__)
     statsdir = pathlib.Path(statsdir)
     now = datetime.datetime.now(datetime.UTC)
 
+    filename = "stats"
+    if day is not None:
+        filename += f"_{day}"
     if ccdid is not None:
-        stats_file = statsdir / f"stats_{day}_{ccdid}_{now:%Y%M%dT%H%M%S}.json"
-    else:
-        stats_file = statsdir / f"stats_{day}_{now:%Y%M%dT%H%M%S}.json"
+        filename += f"_{ccdid}"
+    filename += f"_{now:%Y%M%dT%H%M%S}.json"
 
+    stats_file = statsdir / filename
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))

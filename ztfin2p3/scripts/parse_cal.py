@@ -53,7 +53,7 @@ def parse_cal(year, clean, prefix):
     for y in year:
         bias = parse_tree(BIAS / y)
         flat = parse_tree(FLAT / y)
-        print(f"{len(bias)} bias, {len(flat)}")
+        print(f"{len(bias)} bias, {len(flat)} flats")
 
         if clean:
             print("removal incomplete days")
@@ -76,7 +76,7 @@ def parse_cal(year, clean, prefix):
             to_remove = df[df.tot.lt(64)].date.astype(str).tolist()
             bias = bias[~bias.PERIOD.isin(to_remove)]
             flat = flat[~flat.PERIOD.isin(to_remove)]
-            print(f"{len(bias)} bias, {len(flat)}")
+            print(f"{len(bias)} bias, {len(flat)} flats")
 
         bias.to_parquet(BIAS / "meta" / f"{prefix}masterbias_metadata_{y}.parquet")
         flat.to_parquet(FLAT / "meta" / f"{prefix}masterflat_metadata_{y}.parquet")

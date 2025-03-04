@@ -259,12 +259,12 @@ def build_science_image(
             if with_mask:
                 quad.set_mask(get_mskdata(fname))
 
-            if corr_fringes : 
+            if corr_fringes :
                 from .utils.tools import correct_fringes_zi
                  # Need custom fringez package. For now optional.
                  # In the future corr_fringes will default to True.
-                corr_data = correct_fringes_zi(quad.data, 
-                                                mask_data=quad.mask, 
+                corr_data = correct_fringes_zi(quad.data,
+                                                mask_data=quad.mask,
                                                 image_path=fname)[0]
 
                 quad.set_data(corr_data) #Overwrite with data.
@@ -337,7 +337,7 @@ def build_science_data(
     ----------
     list
         Quadrant data list
-    str 
+    str
         Master bias filepath
     str
        Master flat filepath
@@ -567,6 +567,9 @@ def find_closest_calib_file(
     df.drop_duplicates('PERIOD', inplace=True)
     idx = df.index.get_indexer([date], method="nearest")
 
+    if len(df) == 0:
+        raise ValueError("no calib found")
+
     td = abs(df.index[idx[0]] - date)
     if td > pd.Timedelta(max_timedelta):
         raise ValueError(f"found {kind} but time delta is greater than required ({td})")
@@ -584,16 +587,16 @@ def find_closest_calib_file(
 
 def get_mskdata(filename):
     mskdata = exception_mask(filename,"mskimg.fits.gz")
-    if mskdata is None : 
+    if mskdata is None :
         mskdata = exception_mask(filename,"mskimg.fits")
-    
+
     return mskdata
 
-def exception_mask(filename, suffix): 
+def exception_mask(filename, suffix):
     fname_mask = filename_to_url(filename, suffix=suffix, source="local")
     mskdata = None
-    try : 
-        mskdata = fits.getdata(fname_mask)   
+    try :
+        mskdata = fits.getdata(fname_mask)
 
     except Exception as e:
         logging.getLogger(__name__).warn("%s", e)

@@ -77,7 +77,8 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
 
 
 @click.command(context_settings={"show_default": True})
-@click.argument("day")
+@click.argument("day", default=None, required=False)
+@click.option("-t", "--table", help="parquet table with files to process")
 @click.option("-c", "--ccdid", type=click.IntRange(1, 16), help="ccdid [1-16]")
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
 @click.option("--chunk-id", type=int, help="chunk id")
@@ -92,6 +93,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
 @click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
 def d2a(
     day,
+    table,
     ccdid,
     aper,
     chunk_id,
@@ -105,7 +107,7 @@ def d2a(
     debug,
     pdb,
 ):
-    """Detrending to Aperture pipeline for a given day.
+    """Detrending to Aperture pipeline for a given day or a list of files.
 
     \b
     Process DAY (YYYY-MM-DD or YYYYMMDD):
@@ -125,58 +127,62 @@ def d2a(
 
     tot = time.time()
     logger = logging.getLogger(__name__)
-
     n_errors = 0
-    day = day.replace("-", "")
     radius = np.arange(radius_min, radius_max)
-    stats = init_stats(day=day, ccd=ccdid, science=[])
+    stats = init_stats(ccd=ccdid, science=[])
 
-    rawsci_list = get_rawmeta("science", day, ccdid=ccdid)
+    if day is not None:
+        day = day.replace("-", "")
+        rawsci_list = get_rawmeta("science", day, ccdid=ccdid)
+        logger.info("processing day %s, ccd=%s", day, ccdid)
+    elif table is not None:
+        logger.info("loading file list from %s", table)
+        rawsci_list = pd.read_parquet(table)
+    else:
+        raise ValueError("no day or parquet table")
+
     nfiles = len(rawsci_list)
-    logger.info("processing day %s, ccd=%s: %d files", day, ccdid, nfiles)
+    logger.info("%d files to process", nfiles)
 
     if chunk_id is not None and chunk_size is not None:
         selection = slice(chunk_id * chunk_size, (chunk_id + 1) * chunk_size)
         rawsci_list = rawsci_list.iloc[selection]
         nfiles = len(rawsci_list)
-        logger.info("processing chunk %d, %s, %d files", chunk_id, selection, nfiles)
         stats["chunk"] = [selection.start, selection.stop]
+        logger.info(
+            "processing chunk %d, %s, %d files", chunk_id, stats["chunk"], nfiles
+        )
 
     stats["nfiles"] = nfiles
 
-    # pocket effect correction after 20191022
-    corr_pocket = pd.to_datetime(day) >= pd.to_datetime("20191022")
-    stats["corr_pocket"] = corr_pocket
-
-    if use_closest_calib:
-        bi = fi = None
-    else:
-        bi = BiasPipe(day, ccdid=ccdid, nskip=10)
-        if len(bi.df) == 0:
-            raise Exception(f"no bias for {day}")
-
-        fi = FlatPipe(day, ccdid=ccdid)
-        if len(fi.df) == 0:
-            raise Exception(f"no flat for {day}")
-
     for i, (_, row) in enumerate(rawsci_list.iterrows(), start=1):
-        bias = bi.get_ccd(day=day, ccdid=row.ccdid) if bi is not None else None
-        flat = (
-            fi.get_ccd(day=day, ccdid=row.ccdid, filterid=row.filtercode)
-            if fi is not None
-            else None
-        )
-        raw_file = row.filepath
+        if use_closest_calib:
+            bias = flat = None
+        else:
+            bi = BiasPipe(row.day, ccdid=ccdid, nskip=10)
+            if len(bi.df) == 0:
+                raise Exception(f"no bias for {row.day}")
 
+            fi = FlatPipe(row.day, ccdid=ccdid)
+            if len(fi.df) == 0:
+                raise Exception(f"no flat for {row.day}")
+
+            bias = bi.get_ccd(day=row.day, ccdid=row.ccdid)
+            flat = fi.get_ccd(day=row.day, ccdid=row.ccdid, filterid=row.filtercode)
+
+        # pocket effect correction after 20191022
+        corr_pocket = pd.to_datetime(row.day) >= pd.to_datetime("20191022")
+        raw_file = row.filepath
         msg = "processing sci %d/%d filter=%s ccd=%s pocket=%s: %s"
         logger.info(msg, i, nfiles, row.filtercode, row.ccdid, corr_pocket, raw_file)
 
         sci_info = {
-            "day": day,
+            "day": row.day,
             "filter": row.filtercode,
             "ccd": row.ccdid,
             "file": raw_file,
             "expid": row.expid,
+            "corr_pocket": corr_pocket,
         }
         t0 = time.time()
         try:
@@ -214,7 +220,7 @@ def d2a(
     logger.info("all done, %.2f sec.", stats["total_time"])
 
     if statsdir is not None:
-        save_stats(stats, statsdir, day, ccdid=ccdid)
+        save_stats(stats, statsdir, day=day, ccdid=ccdid)
 
     if n_errors > 0:
         logger.warning("%d sci files failed", n_errors)

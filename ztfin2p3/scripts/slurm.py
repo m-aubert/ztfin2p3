@@ -51,9 +51,10 @@ def sbatch(
 
 @click.command(context_settings={"show_default": True, "ignore_unknown_options": True})
 @click.argument("cmd")
-@click.argument("date")
+@click.option("--date", help="date to process")
 @click.option("--to", help="specify the end of the period to process")
 @click.option("--freq", default="D", help="frequency: D=daily, W=weekly, M=monthly")
+@click.option("--table", help="parquet table with files to process")
 @click.option("--dry-run", is_flag=True, help="show slurm command, don't run")
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--logdir", default=".", help="path where logs are stored")
@@ -70,6 +71,7 @@ def run(
     date,
     to,
     freq,
+    table,
     dry_run,
     envpath,
     logdir,
@@ -80,7 +82,9 @@ def run(
     partition,
     args,
 ):
-    """Run d2a for a DAY or a period on a Slurm cluster."""
+    """Run another subcommand on a Slurm cluster. Additional arguments are
+    passed to the subcommand.
+    """
 
     logdir = pathlib.Path(logdir)
     logdir.mkdir(exist_ok=True)
@@ -92,7 +96,9 @@ def run(
 
     def srun(cmdstr, cpu_time, array=None, ccdid=None, **kwargs):
         logfile = "slurm-%A-%a.log" if array else "slurm-%j.log"
-        name = f"ztf_{cmd}_{date.replace('-', '')}"
+        name = f"ztf_{cmd}"
+        if date is not None:
+            name = +f"_{date.replace('-', '')}"
         if ccdid is not None:
             name += f"_ccd{ccdid}"
 
@@ -136,39 +142,58 @@ def run(
                 srun(cmdstr, cpu_time)
 
     elif cmd == "d2a":
-        if to is not None:
-            meta = get_rawmeta("science", [date, to], use_dask=False)
-        else:
-            meta = get_rawmeta("science", date, use_dask=False)
-
-        meta.day = pd.to_datetime(meta.day)
-        meta = meta.groupby(["day", "ccdid"]).size().unstack(["ccdid"]).fillna(0)
-        meta = meta.astype(int)
-
-        for day, row in meta.iterrows():
-
-            # cpu_time: ~25s without pocket, >1min with
-            # no pocket: 30s * 200exp = 100min
-            # pocket: 80s * 100exp = 130min
-            corr_pocket = day >= pd.to_datetime("20191022")
-            if corr_pocket:
-                chunk_size = 100
-                cpu_time = "04:00:00"
+        if date is not None:
+            if to is not None:
+                meta = get_rawmeta("science", [date, to], use_dask=False)
             else:
-                chunk_size = 200
-                cpu_time = "03:00:00"
+                meta = get_rawmeta("science", date, use_dask=False)
 
-            for ccdid, nfiles in row.items():
-                n_chunks = nfiles // chunk_size + (1 if nfiles % chunk_size else 0)
+            meta.day = pd.to_datetime(meta.day)
+            meta = meta.groupby(["day", "ccdid"]).size().unstack(["ccdid"]).fillna(0)
+            meta = meta.astype(int)
 
-                date = str(day.date())
-                cmdstr = f"{ztfcmd} {cmd} {date} --statsdir {logdir} "
-                cmdstr += f"-d --aper --use-closest-calib --ccdid {ccdid} "
-                cmdstr += f"--chunk-size {chunk_size} "
-                cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID"
-                # cmdstr += " ".join(args)
+            for day, row in meta.iterrows():
+                # cpu_time: ~25s without pocket, >1min with
+                # no pocket: 30s * 200exp = 100min
+                # pocket: 80s * 100exp = 130min
+                corr_pocket = day >= pd.to_datetime("20191022")
+                if corr_pocket:
+                    chunk_size = 100
+                    cpu_time = "04:00:00"
+                else:
+                    chunk_size = 200
+                    cpu_time = "03:00:00"
 
-                print(f"{date=} {ccdid=} {nfiles=} {n_chunks=} {cpu_time=}")
-                srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}", ccdid=ccdid)
+                for ccdid, n_files in row.items():
+                    n_chunks = n_files // chunk_size + (
+                        1 if n_files % chunk_size else 0
+                    )
+
+                    date = str(day.date())
+                    cmdstr = f"{ztfcmd} {cmd} {date} --statsdir {logdir} "
+                    cmdstr += f"-d --aper --use-closest-calib --ccdid {ccdid} "
+                    cmdstr += f"--chunk-size {chunk_size} "
+                    cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID"
+                    cmdstr += " ".join(args)
+
+                    print(f"{date=} {ccdid=} {n_files=} {n_chunks=} {cpu_time=}")
+                    srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}", ccdid=ccdid)
+        else:
+            chunk_size = 10  # x16 since a job processes all ccds here
+            cpu_time = "06:00:00"
+            # read one column just to get the number of rows
+            df = pd.read_parquet(table, columns=["index"])
+            n_files = len(df)
+            n_chunks = n_files // chunk_size + (1 if n_files % chunk_size else 0)
+
+            cmdstr = f"{ztfcmd} {cmd} --statsdir {logdir} "
+            cmdstr += f"-d --aper --use-closest-calib --table {table} "
+            cmdstr += f"--chunk-size {chunk_size} "
+            cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID"
+            cmdstr += " ".join(args)
+
+            print(f"running jobs for {n_files=} {n_chunks=} {cpu_time=}")
+            srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}")
+
     else:
         raise ValueError("unknown command")

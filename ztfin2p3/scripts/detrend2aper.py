@@ -15,7 +15,9 @@ from ztfin2p3.science import build_science_image
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
 
 SCI_PARAMS = dict(
+    corr_fringes=False,
     fp_flatfield=True,
+    max_timedelta="10d",
     overscan_prop=dict(userange=[25, 30]),
     return_sci_quads=True,
     store=False,

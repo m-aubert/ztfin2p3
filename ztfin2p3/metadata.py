@@ -366,10 +366,10 @@ def get_raw(which, date, what, ccdid=None, fid=None,
 
     return getattr(class_, method)(date, **{**prop, **kwargs})
 
-def metadata_to_url(metadata, source="local"):
+def metadata_to_url(metadata, source="local", **kwargs):
     """ """
     from ztfquery.query import metatable_to_url
-    return metatable_to_url(metadata, source="local")
+    return metatable_to_url(metadata, source="local", **kwargs)
 
 
 class MetaDataHandler( object ):

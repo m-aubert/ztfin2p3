@@ -179,7 +179,7 @@ def run(
                     print(f"{date=} {ccdid=} {n_files=} {n_chunks=} {cpu_time=}")
                     srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}", ccdid=ccdid)
         else:
-            chunk_size = 10  # x16 since a job processes all ccds here
+            chunk_size = 100
             cpu_time = "06:00:00"
             # read one column just to get the number of rows
             df = pd.read_parquet(table, columns=["index"])
@@ -189,7 +189,7 @@ def run(
             cmdstr = f"{ztfcmd} {cmd} --statsdir {logdir} "
             cmdstr += f"-d --aper --use-closest-calib --table {table} "
             cmdstr += f"--chunk-size {chunk_size} "
-            cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID"
+            cmdstr += r"--chunk-id \$SLURM_ARRAY_TASK_ID "
             cmdstr += " ".join(args)
 
             print(f"running jobs for {n_files=} {n_chunks=} {cpu_time=}")

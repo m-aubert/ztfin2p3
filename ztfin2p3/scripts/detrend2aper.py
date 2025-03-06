@@ -1,3 +1,4 @@
+from importlib import metadata
 import logging
 import sys
 import time
@@ -9,7 +10,7 @@ from ztfquery.buildurl import get_scifile_of_filename
 
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
 from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
-from ztfin2p3.metadata import get_rawmeta
+from ztfin2p3.metadata import get_rawmeta, metadata_to_url
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
 from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
@@ -65,6 +66,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
                 out, new_suffix=suffix or "apcat", new_extension="parquet"
             )
             store_aperture_catalog(apcat, output_filename)
+            logger.debug("saved catalog: %s", output_filename)
 
         if error:
             logger.error(error)
@@ -135,21 +137,25 @@ def d2a(
 
     if day is not None:
         day = day.replace("-", "")
-        rawsci_list = get_rawmeta("science", day, ccdid=ccdid)
+        meta = get_rawmeta("science", day, ccdid=ccdid)
         logger.info("processing day %s, ccd=%s", day, ccdid)
     elif table is not None:
         logger.info("loading file list from %s", table)
-        rawsci_list = pd.read_parquet(table)
+        meta = pd.read_parquet(table)
+        if "day" not in meta.columns:
+            meta["day"] = meta["filefracday"].astype("str").str[:8]
+        if "filepath" not in meta.columns:
+            meta["filepath"] = metadata_to_url(meta, source="local", datakind="raw")
     else:
         raise ValueError("no day or parquet table")
 
-    nfiles = len(rawsci_list)
+    nfiles = len(meta)
     logger.info("%d files to process", nfiles)
 
     if chunk_id is not None and chunk_size is not None:
         selection = slice(chunk_id * chunk_size, (chunk_id + 1) * chunk_size)
-        rawsci_list = rawsci_list.iloc[selection]
-        nfiles = len(rawsci_list)
+        meta = meta.iloc[selection]
+        nfiles = len(meta)
         stats["chunk"] = [selection.start, selection.stop]
         logger.info(
             "processing chunk %d, %s, %d files", chunk_id, stats["chunk"], nfiles
@@ -157,7 +163,7 @@ def d2a(
 
     stats["nfiles"] = nfiles
 
-    for i, (_, row) in enumerate(rawsci_list.iterrows(), start=1):
+    for i, (_, row) in enumerate(meta.iterrows(), start=1):
         if use_closest_calib:
             bias = flat = None
         else:

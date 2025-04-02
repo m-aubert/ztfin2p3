@@ -1,0 +1,51 @@
+d2a : 
+  radius : [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  min_max_rad : False
+  corr_pocket : False
+  use_closest_calib : True
+
+  SCI_PARAMS : 
+    fp_flatfield : True
+    overscan_prop : 
+        userange : [25, 30]
+    return_sci_quads : True
+    store : False
+    with_mask : True
+    corr_fringes : False
+    max_timedelta : '10d'
+
+  APER_PARAMS : 
+    cat : "gaia_dr3"
+    apply_proper_motion : True
+    as_path : False
+    minimal_columns : True 
+    seplimit : 20
+    bkgann : None
+    joined : True
+    refcat_radius : 0.7
+
+calib :
+  CLIPPING_PROP  : 
+      maxiters : 1
+      cenfunc : "median"
+      stdfunc : "std"
+      masked : False
+      copy : False
+
+  BIAS_PARAMS  : 
+      sigma_clip : 3
+      mergedhow : "nanmean"
+      get_data_props : 
+        overscan_prop :  
+          userange : [25, 30]
+
+  FLAT_PARAMS  : 
+      corr_pocket : False
+      sigma_clip : 3
+      mergedhow : "nanmean"
+      get_data_props : 
+        overscan_prop : 
+          userange : [25,30]
+
+
+

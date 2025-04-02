@@ -533,6 +533,8 @@ def compute_fp_norm(flat_files):
 
     for filepath in flat_files:
         fits.setval(filepath, "HIERARCH FLTNORM_FP", value=fp_flats_norms)
+        #Also record n_ccds used to compute norm for non complete FP.
+        fits.setval(filepath, "HIERARCH NFLATS_FP", value=len(flat_files))
 
     return fp_flats_norms
 

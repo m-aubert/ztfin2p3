@@ -23,6 +23,7 @@ def parse_tree(
     )
     if "flat" in str(path):
         colnames = colnames + ("FILTRKEY", "FLTNORM")
+        #Might want to add the HIERARCH info but need to consider KeyError in header. 
 
     meta = []
     for date in sorted(os.listdir(path)):
@@ -73,10 +74,17 @@ def parse_cal(year, clean, prefix):
             df = df.fillna(0).astype(int)
             df["tot"] = df[["nbias", "zg", "zi", "zr"]].sum(axis=1)
 
+            # Need to think some more on this operation.
+            # Especially since in the future we might have no bias but flats for a day.
             to_remove = df[df.tot.lt(64)].date.astype(str).tolist()
+
             bias = bias[~bias.PERIOD.isin(to_remove)]
             flat = flat[~flat.PERIOD.isin(to_remove)]
             print(f"{len(bias)} bias, {len(flat)} flats")
+        
+        else : 
+            prefix = 'uncut' 
+            #Hard-code prefix to get no cut metadata and prevent accidental overwriting.
 
         bias.to_parquet(BIAS / "meta" / f"{prefix}masterbias_metadata_{y}.parquet")
         flat.to_parquet(FLAT / "meta" / f"{prefix}masterflat_metadata_{y}.parquet")

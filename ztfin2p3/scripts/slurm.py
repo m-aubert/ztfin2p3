@@ -101,7 +101,7 @@ def run(
         logfile = "slurm-%A-%a.log" if array else "slurm-%j.log"
         name = f"ztf_{cmd}"
         if date is not None:
-            name = +f"_{date.replace('-', '')}"
+            name += f"_{date.replace('-', '')}"
         if ccdid is not None:
             name += f"_ccd{ccdid}"
 

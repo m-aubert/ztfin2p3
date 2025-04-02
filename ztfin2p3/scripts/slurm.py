@@ -4,7 +4,7 @@ import subprocess
 import pandas as pd
 import rich_click as click
 from ztfin2p3.metadata import get_rawmeta
-from ztfin2p3.utils import get_config_dict
+from ztfin2p3.scripts.utils import get_config_dict
 
 
 def sbatch(

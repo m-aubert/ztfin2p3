@@ -14,7 +14,7 @@ from ztfin2p3.metadata import get_rawmeta, metadata_to_url
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
 from ztfin2p3.scripts.utils import (_run_pdb, init_stats, save_stats, 
-                                    setup_logger, get_config_dict)
+                                    setup_logger, get_config)
 
 #SCI_PARAMS = dict(
 #    corr_fringes=False,
@@ -38,7 +38,7 @@ from ztfin2p3.scripts.utils import (_run_pdb, init_stats, save_stats,
 
 
 def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, 
-                do_aper=True, SCI_PARAMS=None, APER_PARAMS=None):
+                do_aper=True, sci_params=None, aper_params=None):
 
     logger = logging.getLogger(__name__)
     quads = build_science_image(
@@ -90,7 +90,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket,
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
 @click.option("--chunk-id", type=int, help="chunk id")
 @click.option("--chunk-size", type=int, help="chunk size")
-@click.option("--configpath", help='path to yaml config file')
+@click.option("--config", default='config.yml', help='path to yaml config file')
 @click.option("--statsdir", help="path where statistics are stored")
 @click.option("--suffix", help="suffix for output catalogs")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -102,7 +102,7 @@ def d2a(
     aper,
     chunk_id,
     chunk_size,
-    configpath,
+    config,
     statsdir,
     suffix,
     debug,
@@ -130,7 +130,7 @@ def d2a(
     logger = logging.getLogger(__name__)
     n_errors = 0
 
-    cfg = get_config_dict(config_path=configpath, config_key='d2a')
+    cfg = get_config(config, command='d2a')
     radius = cfg['radius']
 
     stats = init_stats(ccd=ccdid, science=[])
@@ -181,11 +181,8 @@ def d2a(
             bias = bi.get_ccd(day=row.day, ccdid=row.ccdid)
             flat = fi.get_ccd(day=row.day, ccdid=row.ccdid, filterid=row.filtercode)
 
-        if cfg['corr_pocket'] : 
-            # pocket effect correction after 20191022
-            corr_pocket = pd.to_datetime(row.day) >= pd.to_datetime("20191022")
-        else : 
-            corr_pocket = False
+
+        corr_pocket = cfg['corr_pocket'] and pd.to_datetime(row.day) >= pd.to_datetime("20191022")
 
         raw_file = row.filepath
         msg = "processing sci %d/%d filter=%s ccd=%s pocket=%s: %s"
@@ -210,8 +207,8 @@ def d2a(
                 radius,
                 corr_pocket=corr_pocket,
                 do_aper=aper,
-                SCI_PARAMS = cfg['SCI_PARAMS'],
-                APER_PARAMS = cfg['APER_PARAMS']
+                sci_params = cfg['sci_params'],
+                aper_params = cfg['aper_params']
             )
         except Exception as exc:
             if pdb:

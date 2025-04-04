@@ -7,7 +7,7 @@ import rich_click as click
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import compute_fp_norm
 from ztfin2p3.scripts.utils import (_run_pdb, init_stats, 
-                                    save_stats, setup_logger, get_config_dict)
+                                    save_stats, setup_logger, get_config)
 
 #CLIPPING_PROP = dict(
 #    maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
@@ -30,7 +30,7 @@ from ztfin2p3.scripts.utils import (_run_pdb, init_stats,
 @click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option("--statsdir", help="path where statistics are stored")
-@click.option("--configpath", help='path to yaml config file')
+@click.option("--config", default='config.yml', help='path to yaml config file')
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -38,7 +38,7 @@ from ztfin2p3.scripts.utils import (_run_pdb, init_stats,
 def calib(
     day,
     statsdir,
-    configpath,
+    config,
     suffix,
     force,
     debug,
@@ -57,10 +57,10 @@ def calib(
     if debug or pdb:
         sys.excepthook = _run_pdb
 
-    cfg = get_config_dict(configpath=config_path, config_key='calib')
+    cfg = get_config(config, command='calib')
 
-    cfg['BIAS_PARAMS'].update(dict(clipping_prop=cfg['CLIPPING_PROP']))
-    cfg['FLAT_PARAMS'].update(dict(clipping_prop=cfg['CLIPPING_PROP']))
+    cfg['bias'].update(dict(clipping_prop=cfg['clipping_prop']))
+    cfg['flat'].update(dict(clipping_prop=cfg['clipping_prop']))
 
     n_errors = 0
     day = day.replace("-", "")
@@ -86,7 +86,7 @@ def calib(
 
             # Generate master bias:
             t0 = time.time()
-            bi.build_ccds(reprocess=force, **cfg['BIAS_PARAMS'])
+            bi.build_ccds(reprocess=force, **cfg['bias'])
             timing = time.time() - t0
             logger.info("bias done, %.2f sec.", timing)
             stats["bias"].append({"ccd": ccdid, "time": timing})
@@ -99,7 +99,7 @@ def calib(
 
             # Generate master flats:
             t0 = time.time()
-            fi.build_ccds(bias=bi, reprocess=force, **cfg['FLAT_PARAMS'])
+            fi.build_ccds(bias=bi, reprocess=force, **cfg['flat'])
             timing = time.time() - t0
             logger.info("flat done, %.2f sec.", timing)
             stats["flat"].append({"ccd": ccdid, "time": timing})

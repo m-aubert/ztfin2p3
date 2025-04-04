@@ -532,9 +532,9 @@ def compute_fp_norm(flat_files):
     fp_flats_norms = np.median(fp_flats_norms)
 
     for filepath in flat_files:
-        fits.setval(filepath, "HIERARCH FLTNORM_FP", value=fp_flats_norms)
-        #Also record n_ccds used to compute norm for non complete FP.
-        fits.setval(filepath, "HIERARCH NFLATS_FP", value=len(flat_files))
+        with fits.open(filepath, mode="update") as filehandle : 
+            filehandle[0].header["HIERARCH FLTNORM_FP"] = fp_flats_norms
+            filehandle[0].header["HIERARCH NFLATS_FP"] = len(flat_files)
 
     return fp_flats_norms
 

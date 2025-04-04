@@ -4,7 +4,7 @@ import subprocess
 import pandas as pd
 import rich_click as click
 from ztfin2p3.metadata import get_rawmeta
-from ztfin2p3.scripts.utils import get_config_dict
+from ztfin2p3.scripts.utils import get_config
 
 
 def sbatch(
@@ -60,7 +60,7 @@ def sbatch(
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--logdir", default=".", help="path where logs are stored")
 @click.option("--split-ccds", is_flag=True, help="split CCDs using a job array?")
-@click.option("--configpath", help='path to yaml config file')
+@click.option("--config", default='config.yml', help='path to yaml config file')
 # slurm
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
@@ -78,7 +78,7 @@ def run(
     envpath,
     logdir,
     split_ccds,
-    configpath,
+    config,
     account,
     cpu_time,
     mem,
@@ -146,9 +146,8 @@ def run(
 
     elif cmd == "d2a":
         
-        cfg = get_config_dict(config_path=configpath, config_key=cmd)
-        corr_pocket = cfg['corr_pocket']
-
+        cfg = get_config(config, command=cmd)
+            
         if date is not None:
             if to is not None:
                 meta = get_rawmeta("science", [date, to], use_dask=False)
@@ -169,9 +168,7 @@ def run(
                 #           but only applied in zi band.
                 #           Could add condition with corr_fringes and filter. 
 
-                #Maybe cleaner way to write below?
-                #Kind of redundant with d2a script as well.
-                corr_pocket = day >= pd.to_datetime("20191022") if corr_pocket else corr_pocket
+                corr_pocket = cfg['corr_pocket'] and pd.to_datetime(row.day) >= pd.to_datetime("20191022")
 
                 if corr_pocket:
                     chunk_size = 100

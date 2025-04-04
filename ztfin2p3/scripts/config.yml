@@ -4,7 +4,7 @@ d2a :
   corr_pocket : False
   use_closest_calib : True
 
-  SCI_PARAMS : 
+  sci_params : 
     fp_flatfield : True
     overscan_prop : 
         userange : [25, 30]
@@ -14,7 +14,7 @@ d2a :
     corr_fringes : False
     max_timedelta : '10d'
 
-  APER_PARAMS : 
+  aper_params : 
     cat : "gaia_dr3"
     apply_proper_motion : True
     as_path : False
@@ -25,21 +25,21 @@ d2a :
     refcat_radius : 0.7
 
 calib :
-  CLIPPING_PROP  : 
+  clipping_prop : 
       maxiters : 1
       cenfunc : "median"
       stdfunc : "std"
       masked : False
       copy : False
 
-  BIAS_PARAMS  : 
+  bias : 
       sigma_clip : 3
       mergedhow : "nanmean"
       get_data_props : 
         overscan_prop :  
           userange : [25, 30]
 
-  FLAT_PARAMS  : 
+  flat : 
       corr_pocket : False
       sigma_clip : 3
       mergedhow : "nanmean"

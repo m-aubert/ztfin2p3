@@ -65,15 +65,13 @@ def save_stats(stats, statsdir, day=None, ccdid=None):
     stats_file.write_text(json.dumps(stats))
 
 
-def get_config_dict(config_path='config.yml', config_key=None): 
-    if config_path is None : 
-        config_path = 'config.yml'
+def get_config(configpath, command=None): 
         
-    with open(config_path, 'r') as f : 
+    with open(configpath, 'r') as f : 
         cfg = yaml.safe_load(f)
 
-    if config_key is not None : 
-        return cfg[config_key]
+    if command is not None : 
+        return cfg[command]
     
     return cfg
     

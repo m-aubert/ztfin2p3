@@ -6,29 +6,31 @@ import rich_click as click
 
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import compute_fp_norm
-from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
+from ztfin2p3.scripts.utils import (_run_pdb, init_stats, 
+                                    save_stats, setup_logger, get_config)
 
-CLIPPING_PROP = dict(
-    maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
-)
-BIAS_PARAMS = dict(
-    sigma_clip=3,
-    mergedhow="nanmean",
-    clipping_prop=CLIPPING_PROP,
-    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-)
-FLAT_PARAMS = dict(
-    corr_pocket=False,
-    sigma_clip=3,
-    mergedhow="nanmean",
-    clipping_prop=CLIPPING_PROP,
-    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
-)
+#CLIPPING_PROP = dict(
+#    maxiters=1, cenfunc="median", stdfunc="std", masked=False, copy=False
+#)
+#BIAS_PARAMS = dict(
+#    sigma_clip=3,
+#    mergedhow="nanmean",
+#    clipping_prop=CLIPPING_PROP,
+#    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+#)
+#FLAT_PARAMS = dict(
+#    corr_pocket=False,
+#    sigma_clip=3,
+#    mergedhow="nanmean",
+#    clipping_prop=CLIPPING_PROP,
+#    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
+#)
 
 
 @click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option("--statsdir", help="path where statistics are stored")
+@click.option("--config", default='config.yml', help='path to yaml config file')
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
@@ -36,6 +38,7 @@ FLAT_PARAMS = dict(
 def calib(
     day,
     statsdir,
+    config,
     suffix,
     force,
     debug,
@@ -53,6 +56,11 @@ def calib(
     setup_logger(debug=debug)
     if debug or pdb:
         sys.excepthook = _run_pdb
+
+    cfg = get_config(config, command='calib')
+
+    cfg['bias'].update(dict(clipping_prop=cfg['clipping_prop']))
+    cfg['flat'].update(dict(clipping_prop=cfg['clipping_prop']))
 
     n_errors = 0
     day = day.replace("-", "")
@@ -72,10 +80,13 @@ def calib(
                 logger.warning(f"no bias for {day}")
                 n_errors += 1
                 continue
+            
+            #Should add a find nearest calib for bias if bias but no flat ?
+            #How to store this info ? In header ? 
 
             # Generate master bias:
             t0 = time.time()
-            bi.build_ccds(reprocess=force, **BIAS_PARAMS)
+            bi.build_ccds(reprocess=force, **cfg['bias'])
             timing = time.time() - t0
             logger.info("bias done, %.2f sec.", timing)
             stats["bias"].append({"ccd": ccdid, "time": timing})
@@ -88,7 +99,7 @@ def calib(
 
             # Generate master flats:
             t0 = time.time()
-            fi.build_ccds(bias=bi, reprocess=force, **FLAT_PARAMS)
+            fi.build_ccds(bias=bi, reprocess=force, **cfg['flat'])
             timing = time.time() - t0
             logger.info("flat done, %.2f sec.", timing)
             stats["flat"].append({"ccd": ccdid, "time": timing})
@@ -96,14 +107,16 @@ def calib(
             logger.error("failed: %s", e)
             n_errors += 1
 
-    if n_errors == 0:
-        logger.info("compute flat fp norm")
-        stats["flat norm"] = {}
-        fi = FlatPipe(day, suffix=suffix)
-        for filterid, df in fi.df.groupby("filterid"):
-            logger.debug("filter=%s, %d flats", filterid, len(df))
+    #if n_errors == 0:
+    logger.info("compute flat fp norm")
+    stats["flat norm"] = {}
+    fi = FlatPipe(day, suffix=suffix)
+    for filterid, df in fi.df.groupby("filterid"):
+        logger.debug("filter=%s, %d flats", filterid, len(df))
+        if n_errors == 0 : 
+            #Catching weird issues jic
             assert len(df) == 16
-            stats["flat norm"][filterid] = float(compute_fp_norm(df.fileout.tolist()))
+        stats["flat norm"][filterid] = float(compute_fp_norm(df.fileout.tolist()))
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])

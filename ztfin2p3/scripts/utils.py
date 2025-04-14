@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 from typing import Any
+import yaml
 
 from rich.logging import RichHandler
 from ztfimg import __version__ as ztfimg_version
@@ -62,3 +63,15 @@ def save_stats(stats, statsdir, day=None, ccdid=None):
     stats_file = statsdir / filename
     logger.info("writing stats to %s", stats_file)
     stats_file.write_text(json.dumps(stats))
+
+
+def get_config(configpath, command=None): 
+        
+    with open(configpath, 'r') as f : 
+        cfg = yaml.safe_load(f)
+
+    if command is not None : 
+        return cfg[command]
+    
+    return cfg
+    

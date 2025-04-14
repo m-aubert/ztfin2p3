@@ -13,30 +13,33 @@ from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
 from ztfin2p3.metadata import get_rawmeta, metadata_to_url
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
-from ztfin2p3.scripts.utils import _run_pdb, init_stats, save_stats, setup_logger
+from ztfin2p3.scripts.utils import (_run_pdb, init_stats, save_stats, 
+                                    setup_logger, get_config)
 
-SCI_PARAMS = dict(
-    corr_fringes=False,
-    fp_flatfield=True,
-    max_timedelta="10d",
-    overscan_prop=dict(userange=[25, 30]),
-    return_sci_quads=True,
-    store=False,
-    with_mask=True,
-)
-APER_PARAMS = dict(
-    cat="gaia_dr3",
-    apply_proper_motion=True,
-    as_path=False,
-    minimal_columns=True,
-    seplimit=20,
-    bkgann=None,
-    joined=True,
-    refcat_radius=0.7,
-)
+#SCI_PARAMS = dict(
+#    corr_fringes=False,
+#    fp_flatfield=True,
+#    max_timedelta="10d",
+#    overscan_prop=dict(userange=[25, 30]),
+#    return_sci_quads=True,
+#    store=False,
+#    with_mask=True,
+#)
+#APER_PARAMS = dict(
+#    cat="gaia_dr3",
+#    apply_proper_motion=True,
+#    as_path=False,
+#    minimal_columns=True,
+#    seplimit=20,
+#    bkgann=None,
+#    joined=True,
+#    refcat_radius=0.7,
+#)
 
 
-def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
+def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, 
+                do_aper=True, sci_params=None, aper_params=None):
+
     logger = logging.getLogger(__name__)
     quads = build_science_image(
         rawfile,
@@ -87,12 +90,9 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, do_aper=True):
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
 @click.option("--chunk-id", type=int, help="chunk id")
 @click.option("--chunk-size", type=int, help="chunk size")
-@click.option("--radius-min", type=int, default=3, help="minimum aperture radius")
-@click.option("--radius-max", type=int, default=13, help="maximum aperture radius")
+@click.option("--config", default='config.yml', help='path to yaml config file')
 @click.option("--statsdir", help="path where statistics are stored")
 @click.option("--suffix", help="suffix for output catalogs")
-@click.option("--use-closest-calib", is_flag=True, help="use closest calib?")
-@click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")
 @click.option("--pdb", is_flag=True, help="run pdb if an exception occurs")
 def d2a(
@@ -102,12 +102,9 @@ def d2a(
     aper,
     chunk_id,
     chunk_size,
-    radius_min,
-    radius_max,
+    config,
     statsdir,
     suffix,
-    use_closest_calib,
-    force,
     debug,
     pdb,
 ):
@@ -132,7 +129,10 @@ def d2a(
     tot = time.time()
     logger = logging.getLogger(__name__)
     n_errors = 0
-    radius = np.arange(radius_min, radius_max)
+
+    cfg = get_config(config, command='d2a')
+    radius = cfg['radius']
+
     stats = init_stats(ccd=ccdid, science=[])
 
     if day is not None:
@@ -146,6 +146,9 @@ def d2a(
             meta["day"] = meta["filefracday"].astype("str").str[:8]
         if "filepath" not in meta.columns:
             meta["filepath"] = metadata_to_url(meta, source="local", datakind="raw")
+
+        # If duplicate filepath (because quadrants info instead of ccd)
+        meta = meta.drop_duplicates(['filepath'])
     else:
         raise ValueError("no day or parquet table")
 
@@ -164,7 +167,7 @@ def d2a(
     stats["nfiles"] = nfiles
 
     for i, (_, row) in enumerate(meta.iterrows(), start=1):
-        if use_closest_calib:
+        if cfg['use_closest_calib']:
             bias = flat = None
         else:
             bi = BiasPipe(row.day, ccdid=ccdid, nskip=10)
@@ -178,8 +181,9 @@ def d2a(
             bias = bi.get_ccd(day=row.day, ccdid=row.ccdid)
             flat = fi.get_ccd(day=row.day, ccdid=row.ccdid, filterid=row.filtercode)
 
-        # pocket effect correction after 20191022
-        corr_pocket = pd.to_datetime(row.day) >= pd.to_datetime("20191022")
+
+        corr_pocket = cfg['corr_pocket'] and pd.to_datetime(row.day) >= pd.to_datetime("20191022")
+
         raw_file = row.filepath
         msg = "processing sci %d/%d filter=%s ccd=%s pocket=%s: %s"
         logger.info(msg, i, nfiles, row.filtercode, row.ccdid, corr_pocket, raw_file)
@@ -192,6 +196,7 @@ def d2a(
             "expid": row.expid,
             "corr_pocket": corr_pocket,
         }
+
         t0 = time.time()
         try:
             aper_stats = process_sci(
@@ -202,6 +207,8 @@ def d2a(
                 radius,
                 corr_pocket=corr_pocket,
                 do_aper=aper,
+                sci_params = cfg['sci_params'],
+                aper_params = cfg['aper_params']
             )
         except Exception as exc:
             if pdb:

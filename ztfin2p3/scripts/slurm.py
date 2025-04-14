@@ -4,6 +4,7 @@ import subprocess
 import pandas as pd
 import rich_click as click
 from ztfin2p3.metadata import get_rawmeta
+from ztfin2p3.scripts.utils import get_config
 
 
 def sbatch(
@@ -59,6 +60,7 @@ def sbatch(
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--logdir", default=".", help="path where logs are stored")
 @click.option("--split-ccds", is_flag=True, help="split CCDs using a job array?")
+@click.option("--config", default='config.yml', help='path to yaml config file')
 # slurm
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")
@@ -76,6 +78,7 @@ def run(
     envpath,
     logdir,
     split_ccds,
+    config,
     account,
     cpu_time,
     mem,
@@ -98,7 +101,7 @@ def run(
         logfile = "slurm-%A-%a.log" if array else "slurm-%j.log"
         name = f"ztf_{cmd}"
         if date is not None:
-            name = +f"_{date.replace('-', '')}"
+            name += f"_{date.replace('-', '')}"
         if ccdid is not None:
             name += f"_ccd{ccdid}"
 
@@ -142,6 +145,9 @@ def run(
                 srun(cmdstr, cpu_time)
 
     elif cmd == "d2a":
+        
+        cfg = get_config(config, command=cmd)
+            
         if date is not None:
             if to is not None:
                 meta = get_rawmeta("science", [date, to], use_dask=False)
@@ -152,11 +158,18 @@ def run(
             meta = meta.groupby(["day", "ccdid"]).size().unstack(["ccdid"]).fillna(0)
             meta = meta.astype(int)
 
+            #Could add condition with corr_fringes and filter. 
+
             for day, row in meta.iterrows():
                 # cpu_time: ~25s without pocket, >1min with
                 # no pocket: 30s * 200exp = 100min
                 # pocket: 80s * 100exp = 130min
-                corr_pocket = day >= pd.to_datetime("20191022")
+                # fringes : 60s/exp (rule of thumb. need proper timings)
+                #           but only applied in zi band.
+                #           Could add condition with corr_fringes and filter. 
+
+                corr_pocket = cfg['corr_pocket'] and pd.to_datetime(row.day) >= pd.to_datetime("20191022")
+
                 if corr_pocket:
                     chunk_size = 100
                     cpu_time = "04:00:00"

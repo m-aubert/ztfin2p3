@@ -22,8 +22,7 @@ def parse_tree(
         "ZTFIMGV",
     )
     if "flat" in str(path):
-        colnames = colnames + ("FILTRKEY", "FLTNORM")
-        #Might want to add the HIERARCH info but need to consider KeyError in header. 
+        colnames = colnames + ("FILTRKEY", "FLTNORM", "FLTNORM_FP")
 
     meta = []
     for date in sorted(os.listdir(path)):
@@ -32,7 +31,8 @@ def parse_tree(
             print(date, len(flist))
         for fname in flist:
             hdr = fits.getheader(path / date / fname)
-            meta.append([hdr[k] for k in colnames])
+            meta.append([hdr[k] for k in colnames if k in hdr.keys()])
+            # Checking for key to catch KeyError
 
     df = pd.DataFrame(meta, columns=colnames)
     if outfile:
@@ -83,7 +83,7 @@ def parse_cal(year, clean, prefix):
             print(f"{len(bias)} bias, {len(flat)} flats")
         
         else : 
-            prefix = 'uncut' 
+            prefix = 'uncut_' 
             #Hard-code prefix to get no cut metadata and prevent accidental overwriting.
 
         bias.to_parquet(BIAS / "meta" / f"{prefix}masterbias_metadata_{y}.parquet")

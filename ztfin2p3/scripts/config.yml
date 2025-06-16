@@ -34,7 +34,7 @@ calib :
 
   bias : 
       sigma_clip : 3
-      mergedhow : "nanmean"
+      mergedhow : "nanmedian"
       get_data_props : 
         overscan_prop :  
           userange : [25, 30]
@@ -42,7 +42,7 @@ calib :
   flat : 
       corr_pocket : False
       sigma_clip : 3
-      mergedhow : "nanmean"
+      mergedhow : "nanmedian"
       get_data_props : 
         overscan_prop : 
           userange : [25,30]

@@ -1,9 +1,9 @@
 import logging
 import sys
 import time
-
+import os 
 import rich_click as click
-
+from ztfin2p3.io import PACKAGE_PATH
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import compute_fp_norm
 from ztfin2p3.scripts.utils import (_run_pdb, init_stats, 
@@ -26,11 +26,12 @@ from ztfin2p3.scripts.utils import (_run_pdb, init_stats,
 #    get_data_props=dict(overscan_prop=dict(userange=[25, 30])),
 #)
 
+config_path = os.path.join(PACKAGE_PATH, 'scripts/config.yml')
 
 @click.command(context_settings={"show_default": True})
 @click.argument("day")
 @click.option("--statsdir", help="path where statistics are stored")
-@click.option("--config", default='config.yml', help='path to yaml config file')
+@click.option("--config", default=config_path, help='path to yaml config file')
 @click.option("--suffix", help="suffix for output science files")
 @click.option("--force", "-f", is_flag=True, help="force reprocessing all files?")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")

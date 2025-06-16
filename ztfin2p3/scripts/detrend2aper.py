@@ -2,14 +2,14 @@ from importlib import metadata
 import logging
 import sys
 import time
-
+import os
 import numpy as np
 import pandas as pd
 import rich_click as click
 from ztfquery.buildurl import get_scifile_of_filename
 
 from ztfin2p3.aperture import get_aperture_photometry, store_aperture_catalog
-from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath
+from ztfin2p3.io import ipacfilename_to_ztfin2p3filepath, PACKAGE_PATH
 from ztfin2p3.metadata import get_rawmeta, metadata_to_url
 from ztfin2p3.pipe.newpipe import BiasPipe, FlatPipe
 from ztfin2p3.science import build_science_image
@@ -35,6 +35,9 @@ from ztfin2p3.scripts.utils import (_run_pdb, init_stats, save_stats,
 #    joined=True,
 #    refcat_radius=0.7,
 #)
+
+config_path = os.path.join(PACKAGE_PATH, 'scripts/config.yml')
+
 
 
 def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket, 
@@ -90,7 +93,7 @@ def process_sci(rawfile, flat, bias, suffix, radius, corr_pocket,
 @click.option("--aper", is_flag=True, help="compute aperture photometry?")
 @click.option("--chunk-id", type=int, help="chunk id")
 @click.option("--chunk-size", type=int, help="chunk size")
-@click.option("--config", default='config.yml', help='path to yaml config file')
+@click.option("--config", default=config_path, help='path to yaml config file')
 @click.option("--statsdir", help="path where statistics are stored")
 @click.option("--suffix", help="suffix for output catalogs")
 @click.option("--debug", "-d", is_flag=True, help="show debug info?")

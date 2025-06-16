@@ -1,11 +1,14 @@
 import pathlib
 import subprocess
-
+import os
 import pandas as pd
 import rich_click as click
 from ztfin2p3.metadata import get_rawmeta
 from ztfin2p3.scripts.utils import get_config
+from ztfin2p3.io import PACKAGE_PATH
 
+
+config_path = os.path.join(PACKAGE_PATH, 'scripts/config.yml')
 
 def sbatch(
     job_name,
@@ -60,7 +63,7 @@ def sbatch(
 @click.option("--envpath", help="path to the environment where ztfin2p3 is located")
 @click.option("--logdir", default=".", help="path where logs are stored")
 @click.option("--split-ccds", is_flag=True, help="split CCDs using a job array?")
-@click.option("--config", default='config.yml', help='path to yaml config file')
+@click.option("--config", default=config_path, help='path to yaml config file')
 # slurm
 @click.option("--account", default="ztf", help="account to charge resources to")
 @click.option("--cpu-time", "-c", default="2:00:00", help="cputime limit")

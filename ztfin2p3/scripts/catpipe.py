@@ -12,11 +12,11 @@ def get_df_to_process(df, fields=None, years=None, filternames=None):
     """ """
     df = df.copy() # don't affect input catalog
     if fields is not None:
-        df = df[ df["fieldid"].astype(int).isin(np.atleast_1d(fields)) ]
+        df = df[ df["fieldid"].astype(int).isin(np.atleast_1d(fields).astype(int)) ]
     if years is not None:
-        df = df[ df["year"].isin(np.atleast_1d(years)) ]
+        df = df[ df["year"].isin(np.atleast_1d(years).astype(int)) ]
     if filternames is not None:
-        df = df[ df["filtername"].isin(np.atleast_1d(filternames)) ]
+        df = df[ df["filtername"].isin(np.atleast_1d(filternames).astype(str)) ]
 
     return df
 
@@ -62,4 +62,5 @@ def catpipe(years, fields, filters):
     """Parse calibration folder to produce catalogs."""
     METADATA_DF = get_ztfprod_metadata()
     df_to_process = get_df_to_process(METADATA_DF, fields=fields, years=years, filternames=filters)
+    print(f"{len(df_to_process)} to process")
     return launch_catpipe_runs(df_to_process)

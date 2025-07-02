@@ -24,6 +24,7 @@ dependencies = [
     "matplotlib",
     "pandas",
     "pyarrow",
+    "argparse",
     "rich-click",
     "scipy",
     "tomli",

@@ -12,16 +12,22 @@ def metadata_to_catpipe_dir(meta):
     """ """
     return os.path.join(CATPIPE_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
 
-def get_df_to_process(df, fields=None, years=None, filternames=None):
+def get_df_to_process(df, fields=None, years=None, filternames=None, failed=False):
     """ """
     df = df.copy() # don't affect input catalog
     if fields is not None:
         df = df[ df["fieldid"].astype(int).isin(np.atleast_1d(fields).astype(int)) ]
+        
     if years is not None:
         df = df[ df["year"].isin(np.atleast_1d(years).astype(int)) ]
+        
     if filternames is not None:
         df = df[ df["filtername"].isin(np.atleast_1d(filternames).astype(str)) ]
 
+    if failed:
+        results = grab_catpipe_results(df)
+        df = df[~np.asarray(results).astype(bool)]
+        
     return df
 
 def launch_catpipe_runs(dataframe):
@@ -75,9 +81,19 @@ def grab_catpipe_results(dataframe):
 @click.option("--years", help='select the year(s) you want: e.g., --year 2020,2021 ; None means all', default=None)
 @click.option("--fields", help='select the field(s) you want: e.g., --field 600 ; None means all', default=None)
 @click.option("--filters", help='select the filter(s) you want: e.g., --filter r ; None means all', default=None)
-def catpipe(years, fields, filters):
+@click.option("--failed", is_flag=True, default=False, help="should this process only cases that failed.")
+@click.option("--norun", is_flag=True, default=False, help="Do not actually run the sbatch")
+
+def catpipe(years, fields, filters, failed, norun=False):
     """Parse calibration folder to produce catalogs."""
     METADATA_DF = get_ztfprod_metadata()
-    df_to_process = get_df_to_process(METADATA_DF, fields=fields, years=years, filternames=filters)
+    df_to_process = get_df_to_process(METADATA_DF, fields=fields,
+                                          years=years, filternames=filters
+                                          failed=failed)
     print(f"{len(df_to_process)} to process")
+
+    # do not run
+    if not norun:
+        return None
+    
     return launch_catpipe_runs(df_to_process)

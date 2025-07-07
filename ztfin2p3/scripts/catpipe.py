@@ -8,6 +8,10 @@ import os
 CATPIPE_DIR = "/sps/ztf/pipelines/catpipe"
 METADATA_DIR = "/sps/ztf/data/storage/ubercal/metafiles/metafiles_per_field_per_year_per_filter/"
 
+def metadata_to_catpipe_dir(meta):
+    """ """
+    return os.path.join(OUT_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
+
 def get_df_to_process(df, fields=None, years=None, filternames=None):
     """ """
     df = df.copy() # don't affect input catalog
@@ -26,7 +30,7 @@ def launch_catpipe_runs(dataframe):
     from tqdm import tqdm
     
     for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):
-        target_dir = os.path.join(CATPIPE_DIR, f"{col_['year']:4d}", col_["fieldid"], col_["filtername"])
+        target_dir = metadata_to_catpipe_dir(col_)
         #print(target_dir)
         # go to next directory
         os.chdir(target_dir)
@@ -46,7 +50,19 @@ def get_ztfprod_metadata():
     df["fieldid"] = df_info[5].str.replace(".parquet","").astype(str).str.pad(6, fillchar="0")
     df["filtername"] = df_info[3].replace(["1", "2", "3"], ["ztfg", "ztfr", "ztfi"])
     return df
-
+    
+def grab_catpipe_results(dataframe):
+    """ """
+    results = []
+    # this format for tqdm
+    for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):
+        target_dir = metadata_to_catpipe_dir(meta)
+        has_result = os.path.isdir( os.path.join(target_dir, "results") )
+        results.append(has_results(col_))
+        
+    return results
+        
+    
 # =================== #
 #
 #    PIPELINE         #

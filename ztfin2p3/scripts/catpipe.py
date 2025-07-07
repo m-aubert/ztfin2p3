@@ -10,7 +10,7 @@ METADATA_DIR = "/sps/ztf/data/storage/ubercal/metafiles/metafiles_per_field_per_
 
 def metadata_to_catpipe_dir(meta):
     """ """
-    return os.path.join(OUT_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
+    return os.path.join(CATPIPE_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
 
 def get_df_to_process(df, fields=None, years=None, filternames=None):
     """ """

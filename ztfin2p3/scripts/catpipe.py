@@ -26,7 +26,7 @@ def get_df_to_process(df, fields=None, years=None, filternames=None, failed=Fals
 
     if failed:
         results = grab_catpipe_results(df)
-        df = df[~np.asarray(results).astype(bool)]
+        df = df[ ~np.asarray(results).astype(bool) ]
         
     return df
 
@@ -93,7 +93,7 @@ def catpipe(years, fields, filters, failed, norun=False):
     print(f"{len(df_to_process)} to process")
 
     # do not run
-    if not norun:
+    if norun:
         return None
     
     return launch_catpipe_runs(df_to_process)

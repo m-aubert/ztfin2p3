@@ -4,7 +4,7 @@ import rich_click as click
 import numpy as np
 import pandas
 import os
-    
+
 CATPIPE_DIR = "/sps/ztf/pipelines/catpipe"
 METADATA_DIR = "/sps/ztf/data/storage/ubercal/metafiles/metafiles_per_field_per_year_per_filter/"
 
@@ -53,6 +53,7 @@ def get_ztfprod_metadata():
     
 def grab_catpipe_results(dataframe):
     """ """
+    from tqdm import tqdm
     results = []
     # this format for tqdm
     for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):

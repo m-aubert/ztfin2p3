@@ -88,7 +88,7 @@ def catpipe(years, fields, filters, failed, norun=False):
     """Parse calibration folder to produce catalogs."""
     METADATA_DF = get_ztfprod_metadata()
     df_to_process = get_df_to_process(METADATA_DF, fields=fields,
-                                          years=years, filternames=filters
+                                          years=years, filternames=filters,
                                           failed=failed)
     print(f"{len(df_to_process)} to process")
 

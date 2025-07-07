@@ -57,9 +57,9 @@ def grab_catpipe_results(dataframe):
     results = []
     # this format for tqdm
     for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):
-        target_dir = metadata_to_catpipe_dir(meta)
+        target_dir = metadata_to_catpipe_dir(col_)
         has_result = os.path.isdir( os.path.join(target_dir, "results") )
-        results.append(has_results(col_))
+        results.append( has_result )
         
     return results
         

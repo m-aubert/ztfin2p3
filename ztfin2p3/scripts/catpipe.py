@@ -47,18 +47,25 @@ def launch_catpipe_runs(dataframe):
         # launch the proc
         subprocess.run(["sbatch", "./run.sh"], capture_output=True)
 
-def get_ztfprod_metadata():
+def get_ztfprod_metadata(fromfile=None):
     """ """
-    from glob import glob
-
-    allparquets = glob( os.path.join(METADATA_DIR, "*"))
-    basename = [os.path.basename(l) for l in allparquets]
+    if fromfile is not None:
+        from glob import glob
+        allparquets = glob( os.path.join(METADATA_DIR, "*"))
+        basename = [os.path.basename(l) for l in allparquets]
     
-    df = pandas.DataFrame({"basename": basename})
-    df_info = df["basename"].str.split("_", expand=True)[[1, 3, 5]]
-    df["year"] = df_info[1].astype(int)
-    df["fieldid"] = df_info[5].str.replace(".parquet","").astype(str).str.pad(6, fillchar="0")
-    df["filtername"] = df_info[3].replace(["1", "2", "3"], ["ztfg", "ztfr", "ztfi"])
+        df = pandas.DataFrame({"basename": basename})
+        df_info = df["basename"].str.split("_", expand=True)[[1, 3, 5]]
+        df["year"] = df_info[1].astype(int)
+        df["fieldid"] = df_info[5].str.replace(".parquet","").astype(str).str.pad(6, fillchar="0")
+        df["filtername"] = df_info[3].replace(["1", "2", "3"], ["ztfg", "ztfr", "ztfi"])
+
+    else:
+        dir_to_process = open(fromfile, "r").read().splitlines()
+        coltypes = {"year": int, "fieldid": str, "filtername": str}
+        df = pandas.DataFrame( dict(zip(coltypes.keys(), np.asarray([l.split("/")[-3:] for l in dir_to_process]).T))
+                             ).astype(coltypes)
+        
     return df
     
 def grab_catpipe_results(dataframe):
@@ -101,9 +108,10 @@ def grab_catpipe_slurm(dataframe):
 @click.option("--failed", is_flag=True, default=False, help="should this process only cases that failed.")
 @click.option("--noslurm", is_flag=True, default=False, help="should this process only cases that did not have slurm run.")
 @click.option("--norun", is_flag=True, default=False, help="Do not actually run the sbatch")
-def catpipe(years, fields, filters, failed, noslurm, norun=False):
+@click.option("--fromfile", help='provide the list of directory to process. This will overwrite the initial list (all files)', default=None)
+def catpipe(years, fields, filters, failed, noslurm, norun=False, fromfile=None):
     """Parse calibration folder to produce catalogs."""
-    METADATA_DF = get_ztfprod_metadata()
+    METADATA_DF = get_ztfprod_metadata(fromfile=fromfile)
     df_to_process = get_df_to_process(METADATA_DF, fields=fields,
                                           years=years, filternames=filters,
                                           failed=failed, noslurm=noslurm)

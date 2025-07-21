@@ -49,7 +49,7 @@ def launch_catpipe_runs(dataframe):
 
 def get_ztfprod_metadata(fromfile=None):
     """ """
-    if fromfile is not None:
+    if fromfile is None:
         from glob import glob
         allparquets = glob( os.path.join(METADATA_DIR, "*"))
         basename = [os.path.basename(l) for l in allparquets]

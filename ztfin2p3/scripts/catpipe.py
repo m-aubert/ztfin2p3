@@ -101,7 +101,7 @@ def grab_catpipe_slurm(dataframe):
 @click.option("--failed", is_flag=True, default=False, help="should this process only cases that failed.")
 @click.option("--noslurm", is_flag=True, default=False, help="should this process only cases that did not have slurm run.")
 @click.option("--norun", is_flag=True, default=False, help="Do not actually run the sbatch")
-def catpipe(years, fields, filters, failed, norun=False):
+def catpipe(years, fields, filters, failed, noslurm, norun=False):
     """Parse calibration folder to produce catalogs."""
     METADATA_DF = get_ztfprod_metadata()
     df_to_process = get_df_to_process(METADATA_DF, fields=fields,

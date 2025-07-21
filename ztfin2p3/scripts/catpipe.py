@@ -12,7 +12,7 @@ def metadata_to_catpipe_dir(meta):
     """ """
     return os.path.join(CATPIPE_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
 
-def get_df_to_process(df, fields=None, years=None, filternames=None, failed=False, no_slurm=False):
+def get_df_to_process(df, fields=None, years=None, filternames=None, failed=False, noslurm=False):
     """ """
     df = df.copy() # don't affect input catalog
     if fields is not None:
@@ -28,7 +28,7 @@ def get_df_to_process(df, fields=None, years=None, filternames=None, failed=Fals
         results = grab_catpipe_results(df)
         df = df[ ~np.asarray(results).astype(bool) ]
 
-    if no_slurm:
+    if noslurm:
         results = grab_catpipe_slurm(df)
         df = df[ ~np.asarray(results).astype(bool) ]
         

@@ -12,7 +12,7 @@ def metadata_to_catpipe_dir(meta):
     """ """
     return os.path.join(CATPIPE_DIR, f"{meta['year']:4d}", meta["fieldid"], meta["filtername"])
 
-def get_df_to_process(df, fields=None, years=None, filternames=None, failed=False):
+def get_df_to_process(df, fields=None, years=None, filternames=None, failed=False, no_slurm=False):
     """ """
     df = df.copy() # don't affect input catalog
     if fields is not None:
@@ -26,6 +26,10 @@ def get_df_to_process(df, fields=None, years=None, filternames=None, failed=Fals
 
     if failed:
         results = grab_catpipe_results(df)
+        df = df[ ~np.asarray(results).astype(bool) ]
+
+    if no_slurm:
+        results = grab_catpipe_slurm(df)
         df = df[ ~np.asarray(results).astype(bool) ]
         
     return df
@@ -68,7 +72,20 @@ def grab_catpipe_results(dataframe):
         results.append( has_result )
         
     return results
+
+def grab_catpipe_slurm(dataframe):
+    """ """
+    from tqdm import tqdm
+    from glob import glob
+    results = []
+    # this format for tqdm
+    for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):
+        target_dir = metadata_to_catpipe_dir(col_)
+        has_slurm = glob( os.path.join(target_dir, "slurm.*") )
+        results.append( has_slurm )
         
+    return results
+
     
 # =================== #
 #
@@ -82,14 +99,14 @@ def grab_catpipe_results(dataframe):
 @click.option("--fields", help='select the field(s) you want: e.g., --field 600 ; None means all', default=None)
 @click.option("--filters", help='select the filter(s) you want: e.g., --filter r ; None means all', default=None)
 @click.option("--failed", is_flag=True, default=False, help="should this process only cases that failed.")
+@click.option("--noslurm", is_flag=True, default=False, help="should this process only cases that did not have slurm run.")
 @click.option("--norun", is_flag=True, default=False, help="Do not actually run the sbatch")
-
 def catpipe(years, fields, filters, failed, norun=False):
     """Parse calibration folder to produce catalogs."""
     METADATA_DF = get_ztfprod_metadata()
     df_to_process = get_df_to_process(METADATA_DF, fields=fields,
                                           years=years, filternames=filters,
-                                          failed=failed)
+                                          failed=failed, noslurm=noslurm)
     print(f"{len(df_to_process)} to process")
 
     # do not run

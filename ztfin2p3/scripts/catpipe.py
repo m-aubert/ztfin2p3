@@ -81,7 +81,7 @@ def grab_catpipe_slurm(dataframe):
     # this format for tqdm
     for i, col_ in tqdm(dataframe.iterrows(), total=len(dataframe)):
         target_dir = metadata_to_catpipe_dir(col_)
-        has_slurm = glob( os.path.join(target_dir, "slurm.*") )
+        has_slurm = len( glob( os.path.join(target_dir, "slurm.*") ))>0
         results.append( has_slurm )
         
     return results

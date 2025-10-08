@@ -211,5 +211,47 @@ def run(
             print(f"running jobs for {n_files=} {n_chunks=} {cpu_time=}")
             srun(cmdstr, cpu_time, array=f"0-{n_chunks-1}")
 
+    elif cmd == "qa-flat":
+
+        if date is not None : 
+            for filter_ in {'zg', 'zi','zr'}: 
+                for ccdid in range(1,17): 
+                     cmdstr = f"{ztfcmd} {cmd} {date} "
+                     cmdstr += f"--ccdid {ccdid} "
+                     cmdstr += f"--filterkey {filter_} "
+                     cmdstr += " ".join(args)
+                     srun(cmdstr, cpu_time, ccdid=ccdid)
+
+        else : 
+            from ztfin2p3.metadata import period_from_logs
+            
+            for perid in range(len(period_from_logs)-1): 
+                for filter_ in {'zg', 'zi','zr'}: 
+                    for ccdid in range(1,17): 
+                         cmdstr = f"{ztfcmd} {cmd} {perid} "
+                         cmdstr += f"--ccdid {ccdid} "
+                         cmdstr += f"--filterkey {filter_} "
+                         cmdstr += " ".join(args)
+                         srun(cmdstr, cpu_time, ccdid=ccdid)
+
+            
+    elif cmd == "qa-bias":
+
+        if date is not None : 
+            for ccdid in range(1,17): 
+                cmdstr = f"{ztfcmd} {cmd} {date} "
+                cmdstr += f"--ccdid {ccdid} "
+                cmdstr += " ".join(args)
+                srun(cmdstr, cpu_time, ccdid=ccdid)
+        else : 
+            from ztfin2p3.metadata import period_from_logs
+
+            for perid in range(len(period_from_logs)-1):
+                for ccdid in range(1,17): 
+                    cmdstr = f"{ztfcmd} {cmd} {date} "
+                    cmdstr += f"--ccdid {ccdid} "
+                    cmdstr += " ".join(args)
+                    srun(cmdstr, cpu_time, ccdid=ccdid)
+
     else:
         raise ValueError("unknown command")

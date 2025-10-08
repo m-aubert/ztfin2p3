@@ -76,12 +76,16 @@ def calib(
         logger.info("processing day %s, ccd=%s", day, ccdid)
 
         try:
-            bi = BiasPipe(day, ccdid=ccdid, nskip=10)
+            bi = BiasPipe(day, ccdid=ccdid, nskip=10, check_isfile=True) 
             if len(bi.df) == 0:
                 logger.warning(f"no bias for {day}")
                 n_errors += 1
+                fi = FlatPipe(day, ccdid=ccdid, suffix=suffix)
+                if len(fi.df) != 0:
+                    logger.warning(f"Flat exist for {day} but no bias")
+
                 continue
-            
+
             #Should add a find nearest calib for bias if bias but no flat ?
             #How to store this info ? In header ? 
 
@@ -108,16 +112,20 @@ def calib(
             logger.error("failed: %s", e)
             n_errors += 1
 
-    #if n_errors == 0:
     logger.info("compute flat fp norm")
     stats["flat norm"] = {}
     fi = FlatPipe(day, suffix=suffix)
-    for filterid, df in fi.df.groupby("filterid"):
-        logger.debug("filter=%s, %d flats", filterid, len(df))
-        if n_errors == 0 : 
-            #Catching weird issues jic
-            assert len(df) == 16
-        stats["flat norm"][filterid] = float(compute_fp_norm(df.fileout.tolist()))
+    try : 
+        for filterid, df in fi.df.groupby("filterid"):
+            logger.debug("filter=%s, %d flats", filterid, len(df))
+            if n_errors == 0 : 
+                #Catching weird issues jic
+                assert len(df) == 16
+            stats["flat norm"][filterid] = float(compute_fp_norm(df.fileout.tolist()))
+
+    except Exception as e : 
+        logger.error("fp flat norm failed : %s", e)
+        n_errors += 1
 
     stats["total_time"] = time.time() - tot
     logger.info("all done, %.2f sec.", stats["total_time"])

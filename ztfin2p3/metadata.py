@@ -18,6 +18,20 @@ __all__ = ["get_metadata"]
 
 
 
+# Record datetime array with change in camera (correction, cleaning, other works)..
+# Mostly obtained from observation logs information and change detected in early days by Andrew Drake.
+# Will need to be updated accordingly. (e.g end date is set to 2024 for now)
+period_from_logs =  np.array(['2018-03-01', '2018-06-26', '2018-07-18', '2018-08-28', '2018-10-11',
+       '2018-10-30', '2019-01-05', '2019-10-22', '2019-12-08',
+       '2020-04-28', '2020-06-04', '2020-08-12', '2020-08-19',
+       '2020-10-28', '2021-02-18', '2021-05-27', '2021-08-25',
+       '2021-09-28', '2021-09-29', '2021-11-24', '2021-12-13',
+       '2022-01-14', '2022-01-18', '2022-04-01', '2022-04-22',
+       '2022-05-26', '2022-06-22', '2022-08-02', '2022-11-14',
+       '2022-12-03', '2022-12-04', '2023-06-15', '2023-07-18',
+       '2023-09-15', '2023-10-17', '2024-01-01'], dtype='datetime64[D]')
+
+
 def get_sciheader(filename, **kwargs):
     # get needed information
     logger = logging.getLogger(__name__)
@@ -761,3 +775,6 @@ class RawScienceMetaData( RawMetaData ):
             data = data[data["field"].isin(np.atleast_1d(field))]
             
         return data
+
+
+        

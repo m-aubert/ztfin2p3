@@ -30,6 +30,7 @@ class CalibPipe:
         keep_rawmeta: bool = False,
         nskip: int | None = None,
         use_dask: bool = False,
+        check_isfile: bool = False,
         **kwargs,
     ):
         assert self.kind in ("bias", "flat")
@@ -41,6 +42,9 @@ class CalibPipe:
         rawmeta = metadata.get_rawmeta(
             self.kind, self.period, add_filepath=True, use_dask=use_dask, **kwargs
         )
+        if check_isfile and not rawmeta.empty: 
+            rawmeta = rawmeta[rawmeta['filepath'].map(os.path.isfile)]
+
         if keep_rawmeta:
             self.rawmeta = rawmeta
 

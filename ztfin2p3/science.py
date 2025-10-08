@@ -415,7 +415,7 @@ def build_science_headers(rawfile, ipac_filepaths, use_dask=False, **kwargs):
 
     for sciimg_ in ipac_filepaths:
         header = rawhdr.copy()
-        qid = parse_filename(sciimg_).qid
+        qid = parse_filename(sciimg_)['qid']
         headerquad = fits.getheader(rawfile, ext=qid)
         header.update(headerquad)
         scihdr = maybe_delayed(exception_header)(sciimg_)
